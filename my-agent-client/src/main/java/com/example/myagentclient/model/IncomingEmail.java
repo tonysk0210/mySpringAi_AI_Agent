@@ -4,16 +4,15 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * A clean, framework-agnostic view of a single email pulled from the inbox.
- * This is what the rest of the agent reasons about - we never leak the raw
- * Jakarta Mail {@code Message} beyond the monitor.
+ * 從收件匣撈取的單封郵件的乾淨、不依賴框架的資料模型。
+ * Agent 的其餘邏輯只會操作這個物件，原始的 Jakarta Mail {@code Message} 不會流出 Monitor 之外。
  *
- * @param messageId the RFC 822 Message-ID header (stable per message)
- * @param from       sender address
- * @param to         recipient addresses
- * @param subject    subject line (never null; empty string if absent)
- * @param body       best-effort plain-text body
- * @param receivedAt when the mail server received the message
+ * @param messageId RFC 822 Message-ID 標頭（每封信唯一且穩定）
+ * @param from      寄件人地址
+ * @param to        收件人地址列表
+ * @param subject   郵件主旨（不為 null；若缺少則為空字串）
+ * @param body      盡力取得的純文字內文
+ * @param receivedAt 郵件伺服器收到此郵件的時間
  */
 public record IncomingEmail(
         String messageId,
