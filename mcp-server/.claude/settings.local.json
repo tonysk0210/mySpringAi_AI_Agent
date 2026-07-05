@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"D:/IdeaProjects/mySpringAi_AI_Agent\" remote add origin git@github.com:tonysk0210/mySpringAi_AI_Agent.git)",
+      "Bash(git -C \"D:/IdeaProjects/mySpringAi_AI_Agent\" remote -v)",
+      "Bash(git -C \"D:/IdeaProjects/mySpringAi_AI_Agent\" add mcp-server)",
+      "Bash(git -C \"D:/IdeaProjects/mySpringAi_AI_Agent\" status)"
+    ]
+  }
+}
