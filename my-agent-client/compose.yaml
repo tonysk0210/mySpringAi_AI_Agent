@@ -1,0 +1,32 @@
+services:
+  # Agent 透過 SMTP (port 1025) 寄送郵件，
+  # 並透過 REST API (port 8025) 監控收件匣。
+  # 可在 http://localhost:8025 用視覺化介面瀏覽收件匣。
+  # 用來啟動 Mailpit — 一個「假的 SMTP (寄信用的通訊協定) 郵件伺服器 」，專門用於開發和測試環境，讓你可以攔截並查看應用程式寄出的郵件，而不會真的把信寄出去
+  mailpit:
+    image: axllent/mailpit:latest # 使用官方 Mailpit Docker 映像檔
+    container_name: support-agent-mail # 指定容器名稱為 support-agent-mail
+    restart: unless-stopped # 除非手動停止，否則自動重啟（開 Docker 會自動重啟）
+    volumes:
+      - ./data:/data # 將容器的 /data 目錄掛載到主機的 ./data 目錄，方便持久化儲存郵件資料，不會因容器重啟而消失 like h2 File db
+    environment:
+      # 允許任何 (或無) SMTP 認證 - 便利於沙盒環境。
+      MP_SMTP_AUTH_ACCEPT_ANY: "1" # 允許任何 SMTP 認證　接受任何帳號密碼（或不需驗證），方便測試
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1" # 允許不加密的連線（沙盒環境用）
+      MP_MAX_MESSAGES: 5000 # 最大郵件數量
+      MP_DATABASE: /data/mailpit.db # 郵件資料庫路徑
+    ports:
+      - "1025:1025"   # SMTP（應用程式透過這裡「寄信」）
+      - "8025:8025"   # Web UI + REST API（人工查看收件匣）
+
+#   你的 Spring Boot 應用程式
+#          │
+#          │  透過 SMTP (port 1025) 寄信
+#          ▼
+#     Mailpit 容器
+#    （攔截所有郵件，不真的寄出）
+#          │
+#          │  透過瀏覽器 http://localhost:8025
+#          ▼
+#     Web UI 收件匣
+#    （開發者可以視覺化查看郵件內容）
