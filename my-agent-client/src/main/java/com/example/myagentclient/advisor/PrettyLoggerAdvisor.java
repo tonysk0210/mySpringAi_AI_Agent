@@ -33,7 +33,7 @@ public class PrettyLoggerAdvisor implements CallAdvisor {
 
     private void logRequest(ChatClientRequest request) {
         StringBuilder sb = new StringBuilder();
-        sb.append("\n╔══ ► LLM 請求 ").append(BAR).append("\n");
+        sb.append("\n╔══ ► LLM Request ").append(BAR).append("\n");
 
         for (Message message : request.prompt().getInstructions()) {
             switch (message.getMessageType()) {
@@ -87,7 +87,7 @@ public class PrettyLoggerAdvisor implements CallAdvisor {
     private void logResponse(ChatClientResponse response) {
         AssistantMessage output = response.chatResponse().getResult().getOutput();
         StringBuilder sb = new StringBuilder();
-        sb.append("\n╔══ ◄ LLM 回應 ").append(BAR).append("\n");
+        sb.append("\n╔══ ◄ LLM Response ").append(BAR).append("\n");
 
         if (output.getText() != null && !output.getText().isBlank()) {
             appendSection(sb, "[ASSISTANT]", output.getText());
