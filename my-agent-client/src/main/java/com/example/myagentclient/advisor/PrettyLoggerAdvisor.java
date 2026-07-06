@@ -28,12 +28,12 @@ public class PrettyLoggerAdvisor implements CallAdvisor {
     }
 
     // ────────────────────────────────────────────────────────────
-    // Request
+    // 請求
     // ────────────────────────────────────────────────────────────
 
     private void logRequest(ChatClientRequest request) {
         StringBuilder sb = new StringBuilder();
-        sb.append("\n╔══ ► LLM Request ").append(BAR).append("\n");
+        sb.append("\n╔══ ► LLM 請求 ").append(BAR).append("\n");
 
         for (Message message : request.prompt().getInstructions()) {
             switch (message.getMessageType()) {
@@ -81,13 +81,13 @@ public class PrettyLoggerAdvisor implements CallAdvisor {
     }
 
     // ────────────────────────────────────────────────────────────
-    // Response
+    // 回應
     // ────────────────────────────────────────────────────────────
 
     private void logResponse(ChatClientResponse response) {
         AssistantMessage output = response.chatResponse().getResult().getOutput();
         StringBuilder sb = new StringBuilder();
-        sb.append("\n╔══ ◄ LLM Response ").append(BAR).append("\n");
+        sb.append("\n╔══ ◄ LLM 回應 ").append(BAR).append("\n");
 
         if (output.getText() != null && !output.getText().isBlank()) {
             appendSection(sb, "[ASSISTANT]", output.getText());
@@ -96,7 +96,7 @@ public class PrettyLoggerAdvisor implements CallAdvisor {
             sb.append(String.format("║ %-13s %s(%s)%n", "[TOOL_CALL]", tc.name(), tc.arguments()));
         }
         if ((output.getText() == null || output.getText().isBlank()) && output.getToolCalls().isEmpty()) {
-            appendSection(sb, "[ASSISTANT]", "(no text)");
+            appendSection(sb, "[ASSISTANT]", "（無文字）");
         }
 
         sb.append("╚").append(BAR).append("══════════════════");
@@ -104,7 +104,7 @@ public class PrettyLoggerAdvisor implements CallAdvisor {
     }
 
     // ────────────────────────────────────────────────────────────
-    // Helpers
+    // 輔助方法
     // ────────────────────────────────────────────────────────────
 
     private void appendSection(StringBuilder sb, String label, String content) {

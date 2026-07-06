@@ -64,7 +64,7 @@ public class InboxMonitor {
         }
     }
 
-    // Helper Methods
+    // 輔助方法
 
     /**
      * 處理單封郵件：取得完整內容、交給 handler 處理。

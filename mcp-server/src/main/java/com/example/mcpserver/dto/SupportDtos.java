@@ -6,8 +6,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * Flat, serialization-safe view objects returned by the MCP tools. Built inside
- * the transactional tool methods so no lazy JPA proxy ever escapes to the agent.
+ * MCP 工具回傳的扁平、可安全序列化的視圖物件。
+ * 在有 @Transactional 的工具方法內部建立，確保沒有任何 Hibernate Lazy Proxy 逃逸到 Agent 層。
  */
 public final class SupportDtos {
 

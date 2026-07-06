@@ -44,14 +44,14 @@ com.example.mcpserver
 
 ### MCP 工具設計分層
 
-**查詢層（SupportQueryTools）**：`lookup_customer_by_email` → `get_customer_orders` / `get_order_by_number` → `search_products` / `get_product_by_sku` → `detect_duplicate_charges` → `check_warranty` → `get_customer_ticket_history`
+**查詢層（SupportQueryTools）**：`lookup_customer_by_email` → `get_customer_orders_by_email` / `get_customer_orders_by_order_number` → `search_products_by_name_or_sku` / `get_product_by_sku` → `detect_duplicate_charges_by_order_number` → `check_warranty_by_order_number_and_sku` → `get_customer_ticket_history_by_email`
 
 **行動層（SupportActionTools）**：`issue_refund`、`log_support_ticket`
 
 ### 關鍵資料模型設計
 
-- **payments 表允許同一 order_id 有多筆 CAPTURED 記錄**，這是 `detect_duplicate_charges` 能運作的前提，不是設計缺陷。
-- **SupportTicket 歷史**讓 Agent 能識別重複性故障（如 Sarah 攪拌機第三次損壞觸發善意補償）。
+- **payments 表允許同一 order_id 有多筆 CAPTURED 記錄**，這是 `detect_duplicate_charges_by_order_number` 能運作的前提，不是設計缺陷。
+- **支援服務單歷史**讓 Agent 能識別重複性故障（如 Sarah 攪拌機第三次損壞觸發善意補償）。
 - **`specifications` 欄位為 JSON 字串**（`Product.specifications` 型別為 `String`，非 JPA JSON 型別），存放各類商品屬性（電壓、尺寸、材質等）。
 - **CustomerOrder**（而非 `Order`）是類別名稱，因 `ORDER` 是 SQL 保留字。
 
