@@ -28,11 +28,11 @@ KEY (id)
 VALUES
   (1, 'Sarah Mitchell', 'sarah.mitchell@example.com', '+1-415-555-0142', 'en',    'GOLD',
       DATEADD('SECOND', 33600, CAST(DATEADD('DAY', -1216, CURRENT_DATE) AS TIMESTAMP))),
-  (2, 'James Cooper',   'james.cooper@example.com',   '+44-7700-900145', 'en',    'STANDARD',
+  (2, 'James Cooper',   'james.cooper@example.com',   '+44-7700-900145', 'zh',    'STANDARD',
       DATEADD('SECOND', 57900, CAST(DATEADD('DAY', -12,   CURRENT_DATE) AS TIMESTAMP))),
-  (3, 'Priya Sharma',   'priya.sharma@example.com',   '+1-312-555-0188', 'en',    'SILVER',
+  (3, 'Priya Sharma',   'priya.sharma@example.com',   '+1-312-555-0188', 'zh',    'SILVER',
       DATEADD('SECOND', 42120, CAST(DATEADD('DAY', -661,  CURRENT_DATE) AS TIMESTAMP))),
-  (4, 'Rohan Verma',    'rohan.verma@example.com',    '+91-98200-12345', 'en+hi', 'STANDARD',
+  (4, 'Rohan Verma',    'rohan.verma@example.com',    '+91-98200-12345', 'en+zh', 'STANDARD',
       DATEADD('SECOND', 70200, CAST(DATEADD('DAY', -220,  CURRENT_DATE) AS TIMESTAMP)));
 
 ALTER TABLE CUSTOMERS ALTER COLUMN id RESTART WITH 100;

@@ -17,7 +17,7 @@ import java.util.List;
 /**
  * 唯讀 MCP 工具：Agent 在採取行動前用來理解電子郵件的所有查詢方法——
  * 識別顧客身份、取得訂單與商品資訊、偵測重複扣款、確認保固期限，
- * 以及查閱歷史工單以偵測重複性故障。此類別中的所有方法均不會修改資料狀態。
+ * 以及查閱歷史支援服務單以偵測重複性問題或客訴。此類別中的所有方法均不會修改資料狀態。
  */
 @Service
 @Transactional(readOnly = true)
@@ -73,7 +73,7 @@ public class SupportQueryTools {
     }
 
     // ---------------------------------------------------------------------
-    // 商品查詢 / 售前問題 by name or sku
+    // 商品查詢 / 售前諮詢 by name or sku
     // ---------------------------------------------------------------------
     @McpTool(name = "search_products_by_name_or_sku",
             description = "依商品名稱或 SKU 片段搜尋商品目錄。可用於回答售前問題，或識別顧客所描述的商品。")
@@ -91,7 +91,7 @@ public class SupportQueryTools {
     }
 
     // ---------------------------------------------------------------------
-    // 商品查詢 / 售前問題 by sku
+    // 商品查詢 / 售前諮詢 by sku
     // ---------------------------------------------------------------------
     @McpTool(name = "get_product_by_sku",
             description = "依 SKU 查詢單一商品的完整資訊，包含規格 JSON（電壓、尺寸、材質等）。可用於回答規格相關問題，例如商品是否支援歐規電壓。")
@@ -115,7 +115,7 @@ public class SupportQueryTools {
         // 1. 取得訂單
         CustomerOrder order = requireOrder(orderNumber);
 
-        // 2. 過濾出已完成扣款的付款記錄
+        // 2. 過濾出該訂單號碼之下所有已完成扣款的付款記錄
         List<Payment> captured = payments.findByOrderOrderNumberOrderByChargedAtAsc(orderNumber.trim())
                 .stream()
                 .filter(p -> p.getStatus() == Enums.PaymentStatus.CAPTURED)
@@ -147,15 +147,15 @@ public class SupportQueryTools {
 
 
     // ---------------------------------------------------------------------
-    // 歷史記錄：重複性故障偵測
+    // 歷史記錄：重複性客訴偵測
     // ---------------------------------------------------------------------
     @McpTool(name = "get_customer_ticket_history_by_email",
-            description = "取得顧客的歷史工單（最新在前），以便識別重複性故障或反覆出現的客訴——例如同一商品第三次損壞，此情況應給予善意補償。")
+            description = "取得顧客的歷史支援服務單（最新在前），以便識別重複性產品故障或反覆出現的客訴——例如同一商品第三次損壞，此情況應給予善意補償。")
     public SupportDtos.TicketHistory getCustomerTicketHistory(
             @McpToolParam(description = "顧客的電子郵件地址")
             String email) {
 
-        // 1. 依 email 查出所有歷史工單（最新在前）
+        // 1. 依 email 查出所有歷史支援服務單（最新在前）
         List<SupportTicket> found =
                 tickets.findByCustomerEmailIgnoreCaseOrderByCreatedAtDesc(email.trim());
 
@@ -163,7 +163,7 @@ public class SupportQueryTools {
         List<SupportDtos.TicketInfo> infos = found.stream().map(this::toTicketInfo).toList();
 
         // 3. 組裝結果（含自然語言摘要）
-        String summary = "顧客 %s 共有 %d 筆歷史工單。".formatted(email, found.size());
+        String summary = "顧客 %s 共有 %d 筆歷史支援服務單。".formatted(email, found.size());
         return new SupportDtos.TicketHistory(email, found.size(), infos, summary);
     }
 
@@ -199,6 +199,7 @@ public class SupportQueryTools {
                 : "%s 在訂單 %s 中已超出保固期（購買日期：%s，保固到期日：%s）。"
                 .formatted(product.getName(), orderNumber, order.getOrderDate(), end);
 
+        // 6. 回傳結果
         return new SupportDtos.WarrantyStatus(orderNumber, product.getSku(), product.getName(),
                 order.getOrderDate(), product.getWarrantyMonths(), end, inWarranty, summary);
     }
@@ -223,9 +224,11 @@ public class SupportQueryTools {
      */
     private OrderItem resolveItem(CustomerOrder order, String sku) {
         List<OrderItem> items = order.getItems();
+        // 1. 檢查訂單是否有商品明細
         if (items.isEmpty()) {
             throw new IllegalArgumentException("訂單 " + order.getOrderNumber() + " 沒有任何商品明細。");
         }
+        // 2. 如果 SKU 為 null 或空白，則檢查訂單是否只有一件商品
         if (sku == null || sku.isBlank()) {
             if (items.size() > 1) {
                 throw new IllegalArgumentException("訂單 " + order.getOrderNumber()
@@ -233,6 +236,7 @@ public class SupportQueryTools {
             }
             return items.get(0);
         }
+        // 3. 根據 SKU 查找目標商品
         return items.stream()
                 .filter(i -> i.getProduct().getSku().equalsIgnoreCase(sku.trim()))
                 .findFirst()
@@ -282,7 +286,7 @@ public class SupportQueryTools {
         List<SupportDtos.PaymentInfo> pays = o.getPayments().stream().map(this::toPaymentInfo).toList();
         Customer c = o.getCustomer();
 
-        // 3. 組裝最終 DTO
+        // 3. 組裝最終 DTO：從 Customer 只取 fullName + email；OrderItem 只取 sku + productName + qty + unitPrice；Payment 只取必要欄位
         return new SupportDtos.OrderDetails(o.getOrderNumber(), c.getFullName(), c.getEmail(), o.getOrderDate(),
                 o.getStatus().name(), o.getShippingAddress(), o.getTotalAmount(), o.getCurrency(),
                 items, // 上面展開的商品明細

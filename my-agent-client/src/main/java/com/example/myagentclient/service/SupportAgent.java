@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 /**
  * Agent 的核心大腦。封裝了一個與 MCP 伺服器工具整合的 Spring AI {@link ChatClient}，
  * 讓 LLM 自主完成整個處理流程：讀取郵件、呼叫所需的 MCP 工具來識別客戶並收集資訊、
- * 決定行動方案、執行行動，並記錄工單。
+ * 決定行動方案、執行行動，並記錄支援服務單。
  * <p>
  * 這裡不手動協調個別工具呼叫——{@code spring-ai-starter-mcp-client} 自動配置提供的
  * {@code ToolCallbackProvider} 會交給 {@code ChatClient}，由 Spring AI 自動執行工具呼叫迴圈。

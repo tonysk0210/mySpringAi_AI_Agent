@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 
 /**
  * 寫入型 MCP 工具：Agent 決定處理方式後所採取的行動——
- * 發起退款（並將對應付款標記為已退款），以及將此次互動記錄為工單。
+ * 發起退款（並將對應付款標記為已退款），以及將此次互動記錄為支援服務單。
  * 此類別中的所有方法均會寫入資料庫。
  */
 @Service
@@ -32,13 +32,13 @@ public class SupportActionTools {
 
     /**
      * ┌────────────────────┬──────────┬───────────────────────────┐
-     * │                    │ 一般退款   │       重複扣款退款          │
+     * │                    │ 一般退款  │       重複扣款退款          │
      * ├────────────────────┼──────────┼───────────────────────────┤
-     * │ 需要知道訂單?        │ 是        │ 是                        │
+     * │ 需要知道訂單?        │ 是       │ 是                        │
      * ├────────────────────┼──────────┼───────────────────────────┤
-     * │ 需要指定哪筆付款?     │ 不需要    │ 需要，因為有多筆 CAPTURED    │
+     * │ 需要指定哪筆付款?    │ 不需要    │ 需要，因為有多筆 CAPTURED   │
      * ├────────────────────┼──────────┼───────────────────────────┤
-     * │ transactionRef     │ 不傳      │  傳入                      │
+     * │ transactionRef     │ 不傳      │  傳入                     │
      * └────────────────────┴──────────┴───────────────────────────┘
      *
      */
@@ -80,7 +80,7 @@ public class SupportActionTools {
         refund.setCurrency(order.getCurrency()); // ← 幣別從訂單取，不讓 Agent 自行傳
         refund.setReason(reason);
         refund.setRefundType(refundType);
-        refund.setStatus(Enums.RefundStatus.PROCESSED);
+        refund.setStatus(Enums.RefundStatus.PROCESSED); // ← 標記 REFUND 已自動化處理
 
         // 3. 如果有提供 transactionRef，則查找該筆付款並標記為 REFUNDED
         if (transactionRef != null && !transactionRef.isBlank()) {
@@ -91,7 +91,7 @@ public class SupportActionTools {
             refund.setPayment(payment); // ← 建立關聯
         }
 
-        // 4. 寫入資料庫並回傳結果
+        // 4. 將新建立的 Refund 物件並寫入資料庫，同時回傳結果
         Refund saved = refunds.save(refund);
         String summary = "退款 %s %s 已完成，訂單 %s（退款類型：%s）：%s"
                 .formatted(amount, order.getCurrency(), orderNumber, refundType, reason);
@@ -100,12 +100,12 @@ public class SupportActionTools {
     }
 
     // ---------------------------------------------------------------------
-    // 記錄處理結果：建立工單
+    // 記錄處理結果：建立支援服務單
     // ---------------------------------------------------------------------
     @McpTool(name = "log_support_ticket",
-            description = "將此次電子郵件互動記錄為工單，保存原始訊息、偵測語言、分類後的意圖與情緒，以及處理結果。請最後呼叫此工具以記錄決策與執行內容。")
+            description = "將此次電子郵件互動記錄為支援服務單，保存原始訊息、偵測語言、分類後的意圖與情緒，以及處理結果。請最後呼叫此工具以記錄決策與執行內容。")
     public SupportDtos.TicketLogResult logSupportTicket(
-            @McpToolParam(description = "工單對應顧客的電子郵件地址")
+            @McpToolParam(description = "支援服務單對應顧客的電子郵件地址")
             String customerEmail,
             @McpToolParam(description = "顧客的原始訊息（逐字保存）")
             String rawMessage,
@@ -133,26 +133,29 @@ public class SupportActionTools {
         SupportTicket ticket = new SupportTicket();
         ticket.setCustomer(customer);
         ticket.setChannel(Enums.Channel.EMAIL); // ← 固定為 EMAIL 整個系統只處理電郵，無需 Agent 判斷
-        ticket.setRawMessage(rawMessage);
-        ticket.setIntent(intent);
-        ticket.setSentiment(sentiment);
-        ticket.setSubject(subject);
-        ticket.setDetectedLanguage(detectedLanguage);
-        ticket.setResolution(resolution);
+        ticket.setRawMessage(rawMessage); // ← 保存原始郵件內容
+        ticket.setIntent(intent); // ← agent 分類的意圖
+        ticket.setSentiment(sentiment); // ← agent 分類的情緒
+        ticket.setSubject(subject); // ← 電子郵件的主旨摘要
+        ticket.setDetectedLanguage(detectedLanguage); // ← agent 偵測的語言
+        ticket.setResolution(resolution); // ← agent 做了什麼決定，保存回覆內容
         ticket.setStatus(Enums.TicketStatus.RESOLVED); // ← 固定為已解決 Agent 呼叫此工具即代表已完成處理，不存在「記錄中但未解決」的狀態
         ticket.setResolvedAt(LocalDateTime.now());
 
         // 3. 選擇性關聯訂單與商品（若有）JPA 會自動從這兩個物件取出 id，寫入外鍵欄位：order_id 與 product_id
         if (orderNumber != null && !orderNumber.isBlank()) {
             orders.findByOrderNumber(orderNumber.trim()).ifPresent(ticket::setOrder);
+            // ifPresent(ticket::setOrder) → 把物件掛到 ticket 上
         }
         if (sku != null && !sku.isBlank()) {
             products.findBySkuIgnoreCase(sku.trim()).ifPresent(ticket::setProduct);
+            // ifPresent(ticket::setProduct) → 把物件掛到 ticket 上
         }
 
+        // 4. 將新建立的 SupportTicket 物件並寫入資料庫，同時回傳結果
         SupportTicket saved = tickets.save(ticket);
         return new SupportDtos.TicketLogResult(saved.getId(), saved.getStatus().name(),
-                "已建立工單 #%d，顧客：%s。".formatted(saved.getId(), customerEmail));
+                "已建立支援服務單 #%d，顧客：%s。".formatted(saved.getId(), customerEmail));
     }
 
     // ---------------------------------------------------------------------

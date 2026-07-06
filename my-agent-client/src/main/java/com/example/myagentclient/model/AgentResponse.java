@@ -21,7 +21,7 @@ public record AgentResponse(
         String replyBody,
 
         @JsonPropertyDescription("給真人客服人員的簡短內部摘要：客戶是誰、他們的需求、你發現了什麼，"
-                + "以及你採取了什麼行動（包含退款 ID 和工單 ID）。")
+                + "以及你採取了什麼行動（包含退款 ID 和支援服務單 ID）。")
         String operatorSummary
 ) {
 }
