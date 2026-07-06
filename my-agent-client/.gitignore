@@ -31,3 +31,8 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Local data ###
+data/mailpit.db
+data/mailpit.db-shm
+data/mailpit.db-wal

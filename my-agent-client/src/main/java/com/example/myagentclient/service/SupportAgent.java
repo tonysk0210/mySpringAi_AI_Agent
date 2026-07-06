@@ -1,5 +1,7 @@
 package com.example.myagentclient.service;
 
+import com.example.myagentclient.advisor.PrettyLoggerAdvisor;
+import com.example.myagentclient.advisor.TokenUsageAuditAdvisor;
 import com.example.myagentclient.config.InboxProperties;
 import com.example.myagentclient.model.AgentResponse;
 import com.example.myagentclient.model.IncomingEmail;
@@ -33,6 +35,7 @@ public class SupportAgent {
                         .param("support_address", inbox.address())) // 把信箱地址注入到系統提示裡
                 // 2. 公開 MCP 伺服器提供的所有工具。Spring AI 自動在迴圈中執行這些工具，讓 LLM 可以視需要執行任意多個步驟。
                 .defaultTools(mcpTools)
+                .defaultAdvisors(new TokenUsageAuditAdvisor(), new PrettyLoggerAdvisor())
                 .build();
     }
 
