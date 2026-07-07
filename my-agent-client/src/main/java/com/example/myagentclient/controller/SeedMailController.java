@@ -13,13 +13,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Instant;
 
 /**
- * 僅供測試使用的輔助 Controller，透過 SMTP 將假郵件植入受監控的收件匣，
- * 讓收件匣監控器有信件可以撈取。
- * <p>
- * 這是一個測試專用的 REST Controller，讓開發者透過 HTTP POST 請求，把假郵件植入 Mailpit 收件匣，用來觸發 Agent 的處理流程。
- * <pre>
- *   curl -X POST "http://localhost:8080/seed-mail?subject=退款&amp;body=我的訂單在哪裡？"
- * </pre>
+ * 測試用 Controller：透過 SMTP 將假郵件植入 Mailpit，觸發 Agent 的處理流程。
+ * <pre>curl -X POST "http://localhost:8080/seed-mail?subject=退款&amp;body=我的訂單在哪裡？"</pre>
  */
 @RestController
 @RequiredArgsConstructor
@@ -30,11 +25,7 @@ public class SeedMailController {
 
 
     /**
-     *
-     * # 使用預設值
-     * curl -X POST "http://localhost:8080/seed-mail"
-     * # 自訂內容
-     * curl -X POST "http://localhost:8080/seed-mail?from=tony@test.com&subject=退款申請&body=我要退款"
+     * 植入測試郵件；所有參數皆有預設值，可直接 POST 不帶任何參數。
      */
     @PostMapping("/seed-mail")
     public ResponseEntity<SeedResult> seed(
@@ -42,34 +33,26 @@ public class SeedMailController {
             @RequestParam(defaultValue = "測試支援請求") String subject,
             @RequestParam(defaultValue = "您好，我需要協助處理我最近的訂單。") String body) {
 
-        // 1. 建立假郵件
+        // 1. 使用 SimpleMailMessage（不需要 MimeMessage），只是模擬一封普通客戶來信，不需自訂標頭
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(from);
-        message.setTo(inbox.address());
+        message.setTo(inbox.address()); // 植入受監控的支援收件匣，InboxMonitor 下次輪詢時會撈到
         message.setSubject(subject);
         message.setText(body);
 
         try {
             mailSender.send(message);
         } catch (MailException e) {
-            // 通常表示 Mailpit SMTP 伺服器（compose.yaml）尚未啟動。
-            return ResponseEntity.status(502).body(SeedResult.failed(from, inbox.address(), subject, e)); // 失敗 │ 502 Bad Gateway │ Mailpit 未啟動，回傳錯誤訊息
+            // Mailpit SMTP（compose.yaml）尚未啟動；502 = 上游服務不可用
+            return ResponseEntity.status(502).body(SeedResult.failed(from, inbox.address(), subject, e));
         }
 
-        return ResponseEntity.ok(SeedResult.sent(from, inbox.address(), subject, body)); // 成功 │ 200 OK          │ 郵件已植入，回傳 SeedResult
+        // 2. 回傳植入結果
+        return ResponseEntity.ok(SeedResult.sent(from, inbox.address(), subject, body));
     }
 
     /**
-     * 植入嘗試的結果——回傳植入的內容，讓呼叫端確認 Agent 即將撈取的郵件內容。
-     *
-     * @param status    {@code "sent"}（已寄出）或 {@code "failed"}（失敗）
-     * @param message   人類可讀的結果說明
-     * @param from      假郵件使用的寄件人地址
-     * @param to        郵件送達的受監控信箱
-     * @param subject   郵件主旨
-     * @param body      郵件內文（僅成功時存在）
-     * @param error     失敗詳情（僅失敗時存在）
-     * @param timestamp 嘗試的時間
+     * 植入嘗試的結果；{@code body} 僅成功時有值，{@code error} 僅失敗時有值。
      */
     public record SeedResult(
             String status,
@@ -81,12 +64,14 @@ public class SeedMailController {
             String error,
             Instant timestamp
     ) {
+        // 成功：body 填入郵件內文，error 為 null
         static SeedResult sent(String from, String to, String subject, String body) {
             return new SeedResult("sent",
                     "郵件已成功寄送至 %s，Agent 將在下次輪詢時撈取。".formatted(to),
                     from, to, subject, body, null, Instant.now());
         }
 
+        // 失敗：error 填入例外訊息，body 為 null（郵件未寄出，無內文可回報）
         static SeedResult failed(String from, String to, String subject, Exception e) {
             return new SeedResult("failed",
                     "無法將郵件寄送至 %s，請確認 Mailpit SMTP 伺服器是否正在運行。".formatted(to),
@@ -130,7 +115,6 @@ public class SeedMailController {
   }
 
   有兩個靜態工廠方法：
-
   ┌─────────────────────┬──────┬────────────┬───────────┐
   │        方法          │ 用於 │ error 欄位  │ body 欄位 │
   ├─────────────────────┼──────┼────────────┼───────────┤
