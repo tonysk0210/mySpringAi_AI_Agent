@@ -12,18 +12,23 @@ import org.springframework.ai.document.Document;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 public class PrettyLoggerAdvisor implements CallAdvisor {
 
-    private static final String BAR  = "═".repeat(50);
-    private static final String CONT = "║               ";
+    private static final String BAR      = "═".repeat(50);
+    private static final String CONT     = "║               ";
+    private static final int    MAX_LINE = 160; // 超過此寬度強制換行，確保每行都有 ║ 前綴
+
+    private final AtomicInteger callCount = new AtomicInteger(0);
 
     @Override
     public ChatClientResponse adviseCall(ChatClientRequest request, CallAdvisorChain chain) {
-        logRequest(request);
+        int n = callCount.incrementAndGet();
+        logRequest(request, n);
         ChatClientResponse response = chain.nextCall(request);
-        logResponse(response);
+        logResponse(response, n);
         return response;
     }
 
@@ -31,9 +36,9 @@ public class PrettyLoggerAdvisor implements CallAdvisor {
     // 請求
     // ────────────────────────────────────────────────────────────
 
-    private void logRequest(ChatClientRequest request) {
+    private void logRequest(ChatClientRequest request, int n) {
         StringBuilder sb = new StringBuilder();
-        sb.append("\n╔══ ► LLM Request ").append(BAR).append("\n");
+        sb.append("\n╔══ ► LLM Request #").append(n).append(" ").append(BAR).append("\n");
 
         for (Message message : request.prompt().getInstructions()) {
             switch (message.getMessageType()) {
@@ -55,7 +60,7 @@ public class PrettyLoggerAdvisor implements CallAdvisor {
             appendSection(sb, "[ASSISTANT]", message.getText());
         }
         for (AssistantMessage.ToolCall tc : message.getToolCalls()) {
-            sb.append(String.format("║ %-13s %s(%s)%n", "[TOOL_CALL]", tc.name(), tc.arguments()));
+            appendSection(sb, "[TOOL_CALL]", tc.name() + "(" + tc.arguments() + ")");
         }
     }
 
@@ -84,16 +89,16 @@ public class PrettyLoggerAdvisor implements CallAdvisor {
     // 回應
     // ────────────────────────────────────────────────────────────
 
-    private void logResponse(ChatClientResponse response) {
+    private void logResponse(ChatClientResponse response, int n) {
         AssistantMessage output = response.chatResponse().getResult().getOutput();
         StringBuilder sb = new StringBuilder();
-        sb.append("\n╔══ ◄ LLM Response ").append(BAR).append("\n");
+        sb.append("\n╔══ ◄ LLM Response #").append(n).append(" ").append(BAR).append("\n");
 
         if (output.getText() != null && !output.getText().isBlank()) {
             appendSection(sb, "[ASSISTANT]", output.getText());
         }
         for (AssistantMessage.ToolCall tc : output.getToolCalls()) {
-            sb.append(String.format("║ %-13s %s(%s)%n", "[TOOL_CALL]", tc.name(), tc.arguments()));
+            appendSection(sb, "[TOOL_CALL]", tc.name() + "(" + tc.arguments() + ")");
         }
         if ((output.getText() == null || output.getText().isBlank()) && output.getToolCalls().isEmpty()) {
             appendSection(sb, "[ASSISTANT]", "（無文字）");
@@ -114,8 +119,18 @@ public class PrettyLoggerAdvisor implements CallAdvisor {
         for (String line : lines) {
             line = line.trim();
             if (line.isEmpty()) continue;
-            sb.append(first ? firstPrefix : CONT).append(line).append("\n");
-            first = false;
+            do {
+                String prefix = first ? firstPrefix : CONT;
+                int avail = MAX_LINE - prefix.length();
+                if (line.length() <= avail) {
+                    sb.append(prefix).append(line).append("\n");
+                    line = "";
+                } else {
+                    sb.append(prefix).append(line, 0, avail).append("\n");
+                    line = line.substring(avail);
+                }
+                first = false;
+            } while (!line.isEmpty());
         }
     }
 
