@@ -26,6 +26,9 @@ public record InboxProperties(
         if (address == null || address.isBlank()) {
             address = "support@example.com"; // ← 預設值
         }
+        if (pollInterval <= 0) {
+            pollInterval = 10_000L; // ← 預設值
+        }
         if (batchSize <= 0) {
             batchSize = 50; // ← 預設值
         }

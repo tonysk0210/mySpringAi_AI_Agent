@@ -12,13 +12,8 @@ import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
 /**
- * Agent 的核心大腦。封裝了一個與 MCP 伺服器工具整合的 Spring AI {@link ChatClient}，
- * 讓 LLM 自主完成整個處理流程：讀取郵件、呼叫所需的 MCP 工具來識別客戶並收集資訊、
- * 決定行動方案、執行行動，並記錄支援服務單。
- * <p>
- * 這裡不手動協調個別工具呼叫——{@code spring-ai-starter-mcp-client} 自動配置提供的
- * {@code ToolCallbackProvider} 會交給 {@code ChatClient}，由 Spring AI 自動執行工具呼叫迴圈。
- * 我們只需要提供模型的指令（系統提示）以及要處理的郵件內容。
+ * 封裝 {@link ChatClient} 與 MCP 工具，將郵件交給 LLM 端對端自主處理。
+ * 不手動協調工具呼叫順序——Spring AI 自動執行工具呼叫迴圈，我們只需提供系統提示與郵件內容。
  */
 @Service
 public class SupportAgent {
@@ -26,28 +21,30 @@ public class SupportAgent {
     private final ChatClient chatClient;
 
     public SupportAgent(ChatClient.Builder chatClientBuilder,
-                        ToolCallbackProvider mcpTools, // MCP 伺服器提供的工具集
-                        InboxProperties inbox, // 信箱設定（address 等）
-                        @Value("classpath:/prompts/support-agent-system.st") Resource systemPrompt) { // 告訴 LLM：你是誰、你的工作是什麼、你應該怎麼處理郵件
+                        ToolCallbackProvider mcpTools,  // spring-ai-starter-mcp-client 自動配置，包含 MCP 伺服器暴露的所有工具（查客戶、查訂單、退款等）
+                        InboxProperties inboxProperties,          // 取 address 注入系統提示，讓 LLM 知道它代表哪個支援信箱
+                        @Value("classpath:/prompts/support-agent-system.st") Resource systemPrompt) { // 定義 LLM 角色、處理流程與輸出格式的完整指令
+
         this.chatClient = chatClientBuilder
-                // 1. 提供模型操作信箱的完整指令（系統提示），並注入所代表的支援信箱地址。
+                // 1. 載入系統提示；{support_address} 是提示中的佔位符，在此注入實際信箱地址
                 .defaultSystem(sys -> sys.text(systemPrompt)
-                        .param("support_address", inbox.address())) // 把信箱地址注入到系統提示裡
-                // 2. 公開 MCP 伺服器提供的所有工具。Spring AI 自動在迴圈中執行這些工具，讓 LLM 可以視需要執行任意多個步驟。
+                        .param("support_address", inboxProperties.address()))
+
+                // 2. 掛載所有 MCP 工具；Spring AI 自動執行工具呼叫迴圈，LLM 可視需要呼叫任意次
                 .defaultTools(mcpTools)
+
+                // 3. TokenUsageAuditAdvisor 記錄每次呼叫的 token 用量；PrettyLoggerAdvisor 格式化印出 prompt/response
                 .defaultAdvisors(new TokenUsageAuditAdvisor(), new PrettyLoggerAdvisor())
                 .build();
     }
 
     /**
-     * 將單封郵件交給 LLM，讓它端對端自主完成整個處理流程。
-     *
-     * @return Agent 的結構化處理結果：包含寄給客戶的回覆內容，
-     * 以及 Agent 對郵件內容理解與處理行動的內部摘要。
+     * 將郵件交給 LLM 自主處理，回傳含客戶回覆與內部摘要的 {@link AgentResponse}。
      */
     public AgentResponse resolve(IncomingEmail email) {
+
         return chatClient.prompt()
-                // 1. 把郵件內容組成 user message 給 LLM
+                // 1. 將客戶來信的各欄位填入 user message 模板，作為 LLM 本次需要處理的輸入內容
                 .user(u -> u.text("""
                                 支援收件匣收到一封新郵件，請處理。
                                 
@@ -60,12 +57,13 @@ public class SupportAgent {
                                 {body}
                                 """)
                         .param("from", email.from())
-                        .param("to", String.join(", ", email.to()))
+                        .param("to", String.join(", ", email.to())) // List<String> → 逗號分隔字串
                         .param("receivedAt", email.receivedAt())
                         .param("subject", email.subject())
                         .param("body", email.body()))
+                // 2. 觸發 LLM 呼叫（含工具呼叫迴圈），並依 AgentResponse 的 JSON Schema 將回應解析成 Java 物件
                 .call()
-                .entity(AgentResponse.class); // 2. 把回應自動轉成 Java entity 物件
+                .entity(AgentResponse.class);
     }
 }
 /*

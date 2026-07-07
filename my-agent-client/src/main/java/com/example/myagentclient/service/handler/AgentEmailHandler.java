@@ -6,17 +6,12 @@ import com.example.myagentclient.service.SupportAgent;
 import com.example.myagentclient.service.SupportMailSender;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 /**
- * 真正的 {@link EmailHandler}：將每封新郵件交給 {@link SupportAgent}，
- * 讓 LLM 搭配 MCP 工具自主解決問題。
- * <p>
- * 標記 {@link Primary}，使 {@code InboxMonitor} 優先注入此類別，而非備用的 {@link LoggingEmailHandler}。
- * 若 Agent 拋出例外，回傳 {@code false} 讓郵件保持未讀，等待下次輪詢重試。
+ * 主要實作：將郵件交給 {@link SupportAgent}（LLM + MCP 工具）自主處理並回覆。
+ * {@code @Primary} 確保優先於 {@link LoggingEmailHandler} 注入；例外時回傳 {@code false} 觸發重試。
  */
 @Component
 @Primary
@@ -25,15 +20,16 @@ import org.springframework.stereotype.Component;
 public class AgentEmailHandler implements EmailHandler {
 
     private final SupportAgent agent;
-    private final SupportMailSender mailSender;
+    private final SupportMailSender supportMailSender;
 
     @Override
     public boolean handle(IncomingEmail email) {
         log.info("將來自 {} 的郵件（主旨：\"{}\"）交給支援 Agent 處理", email.from(), email.subject());
 
         try {
-            // 1. 交給 Agent 處理
-            AgentResponse response = agent.resolve(email); // 交給 AI 處理
+            // 1. LLM 搭配 MCP 工具分析郵件、呼叫工具，產生結構化回應（replyBody + operatorSummary）
+            AgentResponse response = agent.resolve(email);
+
             log.info("""
                             === Agent 處理結果 ===
                             寄件人 : {}
@@ -43,12 +39,12 @@ public class AgentEmailHandler implements EmailHandler {
                             ====================""",
                     email.from(), email.subject(), response.operatorSummary());
 
-            // 2. 將草擬好的回覆寄回給客戶，並串接在原信件的回覆串上。
-            mailSender.sendReply(email, response); // 回信給客戶
-            return true;
+            // 2. 將 Agent 草擬的回覆寄出，In-Reply-To 標頭確保串接在原信件的回覆串上
+            supportMailSender.sendReply(email, response);
+
+            return true; // 郵件保持已讀
         } catch (Exception e) {
-            // 任何錯誤（LLM/MCP 暫時失敗、工具呼叫失敗等）都會到這裡。
-            // 保持郵件未讀，讓下次輪詢重試。
+            // LLM 逾時、MCP 工具失敗等暫時性錯誤；回傳 false 讓郵件保持未讀，等待下次輪詢重試
             log.error("Agent 處理來自 {} 的郵件失敗（主旨：\"{}\"），將重試",
                     email.from(), email.subject(), e);
             return false;

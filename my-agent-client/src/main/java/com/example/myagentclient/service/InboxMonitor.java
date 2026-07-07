@@ -17,13 +17,8 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
- * 這是整個 Agent 的核心排程服務，負責定時去 Mailpit 撈新信，並把每封信交給 EmailHandler 處理。
- * <p>
- * 定時輪詢 Mailpit 收件匣，將每封未讀郵件轉換成 {@link IncomingEmail}，
- * 並轉發給設定的 {@link EmailHandler} 處理。
- * <p>
- * 已讀／未讀狀態存在 Mailpit 伺服器上：取得郵件時會自動標為已讀，藉此避免重複處理。
- * 若 handler 回報處理失敗，則將郵件標回未讀，讓下次輪詢重新處理。
+ * 定時輪詢 Mailpit 收件匣，將未讀郵件轉為 {@link IncomingEmail} 後交給 {@link EmailHandler} 處理。
+ * 處理成功保持已讀；失敗則標回未讀，下次輪詢自動重試。
  */
 @Slf4j
 @Service
@@ -32,21 +27,18 @@ public class InboxMonitor {
 
     private final MailpitInboxClient mailpitInboxClient; // 負責打 Mailpit 收件匣 API
     private final EmailHandler handler; // 負責處理每封信的邏輯（AI 回覆等）
-    private final InboxProperties props; // 讀取 application.properties 的設定值
+    private final InboxProperties inboxProperties; // 讀取 application.properties 的設定值
 
     /**
-     * 定時輪詢收件匣，撈取未讀郵件並逐一處理。
-     * 每次執行完畢後等待 {@code poll-interval} 毫秒再執行下一次。
-     * 每 10 秒執行一次（從 application.properties 讀取，預設 10000ms）
-     * fixedDelay = 上一次執行完成後才開始計時，不會重疊執行
+     * 輪詢未讀郵件並逐一處理；fixedDelay 確保上一次執行完畢後才開始倒計時，不會重疊。 每 10 秒執行一次
      */
     @Scheduled(fixedDelayString = "${my-agent-client.inbox.poll-interval:10000}")
     public void poll() {
         try {
-            // 1. 取得未讀郵件清單
-            List<MailpitMessageSummary> unread = mailpitInboxClient.listUnread(props.batchSize());
+            // 1. 向 Mailpit 查詢未讀郵件（上限 batchSize，避免單次處理量過大）
+            List<MailpitMessageSummary> unread = mailpitInboxClient.listUnread(inboxProperties.batchSize());
 
-            // 2. 檢查是否有新郵件
+            // 2. 無新郵件則提前返回，跳過後續處理
             if (unread.isEmpty()) {
                 log.debug("沒有新郵件");
                 return;
@@ -54,113 +46,101 @@ public class InboxMonitor {
 
             log.info("發現 {} 封新郵件", unread.size());
 
-            // 3. 逐一處理每封郵件
+            // 3. 逐一處理，每封獨立 try-catch，一封失敗不影響其他封
             for (MailpitMessageSummary summary : unread) {
                 processOne(summary.id());
             }
         } catch (Exception e) {
-            // Mailpit 可能正在啟動或暫時無法連線，記錄警告並等待下次輪詢重試，不中斷排程器。
+            // Mailpit 可能正在啟動或暫時無法連線；吞掉例外讓排程器繼續，下次輪詢自動重試。
             log.warn("收件匣輪詢失敗：{}", e.getMessage(), e);
         }
     }
 
-    // 輔助方法
+    // ─────────────────────────── 輔助方法 ───────────────────────────
 
     /**
-     * 處理單封郵件：取得完整內容、交給 handler 處理。
-     * 若處理失敗或發生例外，將郵件標回未讀以便下次輪詢重試。
-     *
-     * @param id Mailpit 郵件 ID
+     * 取得完整郵件並交給 handler；失敗或例外時標回未讀，讓下次輪詢重試。
      */
     private void processOne(String id) {
         try {
-            // 1. 取得完整郵件內容（同時自動標為已讀）
+            // 1. 取得完整郵件內容（同時自動標為已讀，避免下次輪詢重複取出）
             MailpitMessage message = mailpitInboxClient.getMessage(id);
 
-            // 2. 將 MailpitMessage 轉換成 IncomingEmail
+            // 2. 將 Mailpit 格式轉換成應用程式內部格式，供 handler 使用
             IncomingEmail email = toIncomingEmail(message);
 
-            // 3. 交給 handler 處理
-            boolean handled = handler.handle(email); // true  → 處理成功，保持已讀 ✅
+            // 3. 交給 handler 處理；true = 成功保持已讀，false = 失敗需標回未讀重試
+            boolean handled = handler.handle(email);
 
-            // 4. 根據 handler 的回應決定是否標回未讀
+            // 4. handler 回報失敗 → 標回未讀，讓下次輪詢重新嘗試
             if (!handled) {
-                // 處理失敗，標回未讀，讓下次輪詢重新處理。
-                mailpitInboxClient.setRead(id, false); // false → 處理失敗，標回未讀 🔄
+                mailpitInboxClient.setRead(id, false); // false → 標回未讀，觸發下次重試
             }
         } catch (Exception e) {
             log.error("郵件 {} 處理失敗，標回未讀以便重試", id, e);
             try {
-                mailpitInboxClient.setRead(id, false); // false → 處理失敗，標回未讀 🔄
+                mailpitInboxClient.setRead(id, false); // false → 補救標回未讀，讓輪詢重試
             } catch (Exception reset) {
-                log.warn("無法將郵件 {} 標回未讀：{}", id, reset.getMessage()); // 連標回未讀也失敗，記錄警告但不中斷
+                log.warn("無法將郵件 {} 標回未讀：{}", id, reset.getMessage()); // 連重設也失敗，只記錄不拋出，避免中斷排程器
             }
         }
     }
 
     /**
-     * 將 Mailpit 的 {@link MailpitMessage} 轉換成應用程式內部使用的 {@link IncomingEmail}。
-     * 若寄件人或主旨為 null，則補上預設值。
-     *
-     * @param message Mailpit 回傳的完整郵件物件
-     * @return 轉換後的 {@link IncomingEmail}
+     * 將 {@link MailpitMessage} 轉為內部 {@link IncomingEmail}；寄件人或主旨為 null 時補上預設值。
      */
     private IncomingEmail toIncomingEmail(MailpitMessage message) {
-        // 1. 取得寄件人地址
+        // 1. 寄件人：from 可能為 null（Mailpit 不保證有寄件人），補上預設值避免 NPE
         String from = message.from() != null ? message.from().address() : "(未知)";
 
-        // 2. 取得收件人地址
+        // 2. 收件人：MailpitAddress → String，只取 address 欄位，捨棄 display name
         List<String> to = message.to().stream()
                 .map(MailpitAddress::address)
                 .toList();
-        // 3. 取得郵件主旨
+
+        // 3. 主旨：subject 可能為 null，補空字串讓下游不需判斷 null
         String subject = message.subject() != null ? message.subject() : "";
-        // 4. 取得郵件最佳內文
+
+        // 4. 內文：優先純文字，降級 HTML，詳見 bestBody()
         String body = bestBody(message);
-        // 5. 取得郵件接收時間
+
+        // 5. 接收時間：date 為 Mailpit 字串格式，交給 parseDate() 容錯解析
         Instant receivedAt = parseDate(message.date());
-        // 6. 建立 IncomingEmail 物件
+
+        // 6. 組裝並回傳，messageId 作為去重識別碼
         return new IncomingEmail(message.messageId(), from, to, subject, body, receivedAt);
     }
 
     /**
-     * 取得郵件的最佳內文：優先使用純文字，若純文字為空則改用 HTML，兩者皆無則回傳空字串。
-     *
-     * @param message Mailpit 郵件物件
-     * @return 郵件內文字串
+     * 優先取純文字內文，降級 HTML，兩者皆無則回傳空字串。
      */
     private String bestBody(MailpitMessage message) {
-        // 1. 檢查純文字內文
+        // 1. 優先純文字：無 HTML 標籤干擾，AI 處理更乾淨
         if (message.text() != null && !message.text().isBlank()) {
             return message.text().strip();
         }
-        // 2. 檢查 HTML 內文
+        // 2. 降級 HTML：純文字不存在時的備援；兩者皆無回傳空字串，讓 handler 自行決定如何處理
         return message.html() != null ? message.html().strip() : "";
     }
 
     /**
-     * 將 Mailpit 回傳的日期字串解析成 {@link Instant}。
-     * 依序嘗試 {@link OffsetDateTime} 和 {@link Instant} 格式，
-     * 若兩者皆失敗則回傳當下時間 {@code Instant.now()}。
-     *
-     * @param date Mailpit 回傳的日期字串
-     * @return 解析後的 {@link Instant}
+     * 將日期字串依序嘗試 {@link OffsetDateTime}、{@link Instant} 格式解析；兩者皆失敗則回傳 {@code Instant.now()}。
      */
     private Instant parseDate(String date) {
 
-        // 1. 檢查日期字串是否為空
+        // 1. Mailpit 未回傳時間時，用當下時間兜底，避免因缺少日期而中斷處理
         if (date == null || date.isBlank()) {
-            return Instant.now(); // 當下時間作為預設值
+            return Instant.now();
         }
         try {
-            // 2. 將日期字串解析成 OffsetDateTime → 標準格式（含時區）
+            // 2. 優先嘗試 OffsetDateTime（含時區偏移，例：2024-01-01T12:00:00+08:00），Mailpit 最常見格式
             return OffsetDateTime.parse(date).toInstant();
         } catch (Exception e) {
             try {
-                // 3. 將日期字串解析成 Instant → ISO-8601 格式
+                // 3. 降級嘗試純 UTC Instant（例：2024-01-01T12:00:00Z）
                 return Instant.parse(date);
             } catch (Exception ex) {
-                return Instant.now(); // 解析失敗，返回當下時間作為預設值
+                return Instant.now(); // 兩種格式皆失敗，用當下時間兜底，不因日期解析錯誤中斷整封郵件
             }
         }
     }

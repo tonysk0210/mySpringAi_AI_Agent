@@ -61,7 +61,7 @@ public class PrettyLoggerAdvisor implements CallAdvisor {
 
     private void appendToolResponse(StringBuilder sb, ToolResponseMessage message) {
         for (ToolResponseMessage.ToolResponse tr : message.getResponses()) {
-            sb.append(String.format("║ %-13s %s → %s%n", "[TOOL_RESP]", tr.name(), tr.responseData()));
+            appendSection(sb, "[TOOL_RESP]", tr.name() + " → " + tr.responseData());
         }
     }
 
