@@ -1,3 +1,15 @@
+#   你的 Spring Boot 應用程式
+#          │
+#          │  透過 SMTP (port 1025) 寄信
+#          ▼
+#     Mailpit 容器
+#    （攔截所有郵件，不真的寄出）
+#          │
+#          │  透過瀏覽器 http://localhost:8025
+#          ▼
+#     Web UI 收件匣
+#    （開發者可以視覺化查看郵件內容）
+
 services:
   # Agent 透過 SMTP (port 1025) 寄送郵件，
   # 並透過 REST API (port 8025) 監控收件匣。
@@ -18,15 +30,3 @@ services:
     ports:
       - "1025:1025"   # SMTP（應用程式透過這裡「寄信」）
       - "8025:8025"   # Web UI + REST API（人工查看收件匣）
-
-#   你的 Spring Boot 應用程式
-#          │
-#          │  透過 SMTP (port 1025) 寄信
-#          ▼
-#     Mailpit 容器
-#    （攔截所有郵件，不真的寄出）
-#          │
-#          │  透過瀏覽器 http://localhost:8025
-#          ▼
-#     Web UI 收件匣
-#    （開發者可以視覺化查看郵件內容）
