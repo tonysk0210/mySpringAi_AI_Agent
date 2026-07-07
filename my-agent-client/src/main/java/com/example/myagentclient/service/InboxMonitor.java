@@ -1,6 +1,6 @@
 package com.example.myagentclient.service;
 
-import com.example.myagentclient.client.MailpitClient;
+import com.example.myagentclient.client.MailpitInboxClient;
 import com.example.myagentclient.client.dto.MailpitAddress;
 import com.example.myagentclient.client.dto.MailpitMessage;
 import com.example.myagentclient.client.dto.MailpitMessageSummary;
@@ -30,7 +30,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class InboxMonitor {
 
-    private final MailpitClient mailpitClient; // 負責打 Mailpit API
+    private final MailpitInboxClient mailpitInboxClient; // 負責打 Mailpit 收件匣 API
     private final EmailHandler handler; // 負責處理每封信的邏輯（AI 回覆等）
     private final InboxProperties props; // 讀取 application.properties 的設定值
 
@@ -44,7 +44,7 @@ public class InboxMonitor {
     public void poll() {
         try {
             // 1. 取得未讀郵件清單
-            List<MailpitMessageSummary> unread = mailpitClient.listUnread(props.batchSize());
+            List<MailpitMessageSummary> unread = mailpitInboxClient.listUnread(props.batchSize());
 
             // 2. 檢查是否有新郵件
             if (unread.isEmpty()) {
@@ -75,7 +75,7 @@ public class InboxMonitor {
     private void processOne(String id) {
         try {
             // 1. 取得完整郵件內容（同時自動標為已讀）
-            MailpitMessage message = mailpitClient.getMessage(id);
+            MailpitMessage message = mailpitInboxClient.getMessage(id);
 
             // 2. 將 MailpitMessage 轉換成 IncomingEmail
             IncomingEmail email = toIncomingEmail(message);
@@ -86,12 +86,12 @@ public class InboxMonitor {
             // 4. 根據 handler 的回應決定是否標回未讀
             if (!handled) {
                 // 處理失敗，標回未讀，讓下次輪詢重新處理。
-                mailpitClient.setRead(id, false); // false → 處理失敗，標回未讀 🔄
+                mailpitInboxClient.setRead(id, false); // false → 處理失敗，標回未讀 🔄
             }
         } catch (Exception e) {
             log.error("郵件 {} 處理失敗，標回未讀以便重試", id, e);
             try {
-                mailpitClient.setRead(id, false); // false → 處理失敗，標回未讀 🔄
+                mailpitInboxClient.setRead(id, false); // false → 處理失敗，標回未讀 🔄
             } catch (Exception reset) {
                 log.warn("無法將郵件 {} 標回未讀：{}", id, reset.getMessage()); // 連標回未讀也失敗，記錄警告但不中斷
             }

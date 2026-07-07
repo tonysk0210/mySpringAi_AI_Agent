@@ -12,19 +12,19 @@ import org.springframework.web.client.RestClient;
 import java.util.List;
 
 /**
- * Mailpit REST API 的薄層封裝。將 Agent 所需的幾個呼叫封裝起來，
+ * Mailpit 收件匣 REST API 的薄層封裝。將 Agent 所需的幾個讀取呼叫封裝起來，
  * 讓其他程式碼不需要直接處理原始 HTTP 或 Mailpit 網址。
- * 這是一個封裝 Mailpit REST API 的客戶端類別，Agent 透過它來查詢、讀取、標記郵件，不需要在其他地方直接寫 HTTP 請求
+ * 這是一個封裝 Mailpit 收件匣相關 API 的客戶端類別，Agent 透過它來查詢、讀取、標記郵件，不需要在其他地方直接寫 HTTP 請求。
  *
  * @see <a href="https://mailpit.axllent.org/docs/api-v1/">Mailpit API v1</a>
  */
 @Component
-public class MailpitClient {
+public class MailpitInboxClient {
 
     private final RestClient restClient;
     private final String inboxAddress;
 
-    public MailpitClient(RestClient.Builder builder, InboxProperties props) {
+    public MailpitInboxClient(RestClient.Builder builder, InboxProperties props) {
         this.restClient = builder.baseUrl(props.baseUrl()).build(); // Spring 的 HTTP 客戶端，設定好 base URL（http://localhost:8025）
         this.inboxAddress = props.address(); // 支援信箱地址（support@example.com）
     }
