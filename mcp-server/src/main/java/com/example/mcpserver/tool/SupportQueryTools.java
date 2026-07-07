@@ -98,6 +98,7 @@ public class SupportQueryTools {
     public SupportDtos.ProductInfo getProductBySku(
             @McpToolParam(description = "商品 SKU，例如 X200 或 BLND-300")
             String sku) {
+        // 1. 檢查商品是否存在
         Product p = products.findBySkuIgnoreCase(sku.trim())
                 .orElseThrow(() -> new IllegalArgumentException("找不到此 SKU 對應的商品：" + sku));
         return toProductInfo(p);
