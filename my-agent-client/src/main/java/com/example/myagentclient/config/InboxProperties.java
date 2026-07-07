@@ -3,12 +3,11 @@ package com.example.myagentclient.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Agent 透過 Mailpit REST API 監控的收件匣設定。
- * 綁定自 {@code my-agent-client.inbox.*} 設定。
+ * Agent 監控 Mailpit 收件匣所需的設定，綁定自 {@code my-agent-client.inbox.*}。
  *
- * @param baseUrl      Mailpit HTTP API/UI 的基底網址（例如 http://localhost:8025）
- * @param address      支援信箱地址；植入測試郵件時作為收件人使用
- * @param pollInterval 輪詢新郵件的間隔時間，單位為毫秒
+ * @param baseUrl      Mailpit HTTP API/UI 基底網址
+ * @param address      Agent 監控的支援信箱地址
+ * @param pollInterval 收件匣輪詢間隔，單位為毫秒
  * @param batchSize    每次輪詢最多抓取的未讀郵件數量
  */
 @ConfigurationProperties(prefix = "my-agent-client.inbox")
@@ -30,5 +29,5 @@ public record InboxProperties(
         if (batchSize <= 0) {
             batchSize = 50; // ← 預設值
         }
-    }// 出了這個 {} 之後，欄位就被鎖定，不能再改了
+    } // 出了這個 {} 之後，欄位就被鎖定，不能再改了
 }

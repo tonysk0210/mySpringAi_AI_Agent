@@ -19,6 +19,8 @@ public record MailpitMessagesResponse(
         return messages != null ? messages : List.of();
     }
 }
+
+
 /*
   Mailpit API 實際回傳的 JSON 長這樣
 
