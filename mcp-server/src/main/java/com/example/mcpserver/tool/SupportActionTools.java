@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 寫入型 MCP 工具：Agent 決定處理方式後所採取的行動——
@@ -30,18 +31,6 @@ public class SupportActionTools {
     private final RefundRepository refunds;
     private final SupportTicketRepository tickets;
 
-    /**
-     * ┌────────────────────┬──────────┬───────────────────────────┐
-     * │                    │ 一般退款  │       重複扣款退款          │
-     * ├────────────────────┼──────────┼───────────────────────────┤
-     * │ 需要知道訂單?        │ 是       │ 是                        │
-     * ├────────────────────┼──────────┼───────────────────────────┤
-     * │ 需要指定哪筆付款?    │ 不需要    │ 需要，因為有多筆 CAPTURED   │
-     * ├────────────────────┼──────────┼───────────────────────────┤
-     * │ transactionRef     │ 不傳      │  傳入                     │
-     * └────────────────────┴──────────┴───────────────────────────┘
-     *
-     */
     /* 資料寫入流程圖
 
       issueRefund 呼叫
@@ -49,7 +38,7 @@ public class SupportActionTools {
               ├─ 寫入 REFUNDS 表（一定發生）
               │       └─ order_id, amount, currency, reason, refundType, status=PROCESSED
               │
-              └─ 若有 transactionRef（選擇性）
+              └─ 查找該訂單最新一筆 CAPTURED 付款（強制，無則拋出例外）
                       ├─ 更新 PAYMENTS 表：status → REFUNDED
                       └─ 寫入 REFUNDS.payment_id（建立關聯）
     */
@@ -57,7 +46,7 @@ public class SupportActionTools {
     // 1. 執行行動：發起退款
     // ---------------------------------------------------------------------
     @McpTool(name = "issue_refund",
-            description = "對訂單發起退款並記錄。可選擇性地透過交易參考號綁定特定一筆付款（例如退還重複扣款中的其中一筆），該付款狀態將被標記為 REFUNDED。此工具會執行真實操作——僅在確認退款合理後才呼叫。")
+            description = "對訂單發起退款並記錄。後端會自動找到該訂單最新一筆 CAPTURED 付款並標記為 REFUNDED；若無 CAPTURED 付款則拒絕退款。此工具會執行真實操作——僅在確認退款合理後才呼叫。")
     public SupportDtos.RefundResult issueRefund(
             @McpToolParam(description = "要退款的訂單編號，例如 4471")
             String orderNumber,
@@ -66,9 +55,7 @@ public class SupportActionTools {
             @McpToolParam(description = "退款類型，說明退款的性質")
             Enums.RefundType refundType,
             @McpToolParam(description = "退款原因的簡短說明")
-            String reason,
-            @McpToolParam(required = false, description = "要沖銷的特定付款交易參考號；可選。若提供，該筆付款將被標記為 REFUNDED。") // 對應 PAYMENTS 資料表的 transaction_ref 欄位，針對重複扣款退款做沖銷
-            String transactionRef) {
+            String reason) {
 
         // 1. 確認訂單存在
         CustomerOrder order = requireOrder(orderNumber);
@@ -80,16 +67,25 @@ public class SupportActionTools {
         refund.setCurrency(order.getCurrency()); // ← 幣別從訂單取，不讓 Agent 自行傳
         refund.setReason(reason);
         refund.setRefundType(refundType);
-        refund.setStatus(Enums.RefundStatus.PROCESSED); // ← 標記 REFUND 已自動化處理
+        refund.setStatus(Enums.RefundStatus.PROCESSED);
 
-        // 3. 如果有提供 transactionRef，則查找該筆付款並標記為 REFUNDED
-        if (transactionRef != null && !transactionRef.isBlank()) {
-            Payment payment = payments.findByTransactionRef(transactionRef.trim())
-                    .orElseThrow(() -> new IllegalArgumentException(
-                            "找不到此交易參考號對應的付款記錄：" + transactionRef));
-            payment.setStatus(Enums.PaymentStatus.REFUNDED); // ← 標記 REFUND 狀態
-            refund.setPayment(payment); // ← 建立關聯
+        // 3. 強制找 CAPTURED 付款並沖銷；orderNumber 已由 query 過濾，按 chargedAt 升冪排序取最大 id
+        List<Payment> captured = payments.findByOrderOrderNumberOrderByChargedAtAsc(orderNumber)
+                .stream()
+                .filter(p -> p.getStatus() == Enums.PaymentStatus.CAPTURED)
+                .toList();
+
+        if (captured.isEmpty()) {
+            throw new IllegalStateException(
+                    "訂單 " + orderNumber + " 找不到 CAPTURED 狀態的付款，無法執行退款");
         }
+
+        // 取最後一筆（最大 id）：
+        // - 單筆 CAPTURED → 唯一選擇
+        // - 多筆 CAPTURED（duplicate charge）→ 兩筆金額相同，選最新插入的一筆，結果一致
+        Payment target = captured.get(captured.size() - 1);
+        target.setStatus(Enums.PaymentStatus.REFUNDED);
+        refund.setPayment(target);
 
         // 4. 將新建立的 Refund 物件並寫入資料庫，同時回傳結果
         Refund saved = refunds.save(refund);
