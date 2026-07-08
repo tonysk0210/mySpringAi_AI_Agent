@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 public class SupportAgent {
 
     private final ChatClient chatClient;
+    private final PrettyLoggerAdvisor prettyLogger = new PrettyLoggerAdvisor();
 
     public SupportAgent(ChatClient.Builder chatClientBuilder,
                         ToolCallbackProvider mcpTools,  // spring-ai-starter-mcp-client 自動配置，包含 MCP 伺服器暴露的所有工具（查客戶、查訂單、退款等）
@@ -34,7 +35,7 @@ public class SupportAgent {
                 .defaultTools(mcpTools)
 
                 // 3. TokenUsageAuditAdvisor 記錄每次呼叫的 token 用量；PrettyLoggerAdvisor 格式化印出 prompt/response
-                .defaultAdvisors(new TokenUsageAuditAdvisor(), new PrettyLoggerAdvisor())
+                .defaultAdvisors(new TokenUsageAuditAdvisor(), prettyLogger)
                 .build();
     }
 
@@ -42,6 +43,7 @@ public class SupportAgent {
      * 將郵件交給 LLM 自主處理，回傳含客戶回覆與內部摘要的 {@link AgentResponse}。
      */
     public AgentResponse resolve(IncomingEmail email) {
+        prettyLogger.reset(); // 每封郵件重新從 #1 計數
 
         return chatClient.prompt()
                 // 1. 將客戶來信的各欄位填入 user message 模板，作為 LLM 本次需要處理的輸入內容

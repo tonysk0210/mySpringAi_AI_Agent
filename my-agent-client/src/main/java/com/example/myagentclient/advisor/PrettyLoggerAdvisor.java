@@ -23,6 +23,11 @@ public class PrettyLoggerAdvisor implements CallAdvisor {
 
     private final AtomicInteger callCount = new AtomicInteger(0);
 
+    /** 每封郵件開始處理前呼叫，讓同一個 work cycle 的編號從 #1 重新計算。 */
+    public void reset() {
+        callCount.set(0);
+    }
+
     @Override
     public ChatClientResponse adviseCall(ChatClientRequest request, CallAdvisorChain chain) {
         int n = callCount.incrementAndGet();

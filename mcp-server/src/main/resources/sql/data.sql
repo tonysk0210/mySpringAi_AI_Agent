@@ -185,9 +185,9 @@ VALUES
    DATEADD('SECOND', 67200, CAST(DATEADD('DAY', -98, CURRENT_DATE) AS TIMESTAMP)),
    DATEADD('SECOND', 52500, CAST(DATEADD('DAY', -94, CURRENT_DATE) AS TIMESTAMP))),
   -- Rohan, an earlier minor query (so he is a known customer)
-  (3, 4, NULL, NULL, 'EMAIL', 'Order tracking',
-   'Where is my order? / mera order kahan hai?',
-   'en+hi', 'GENERAL', 'NEUTRAL', 'RESOLVED',
+  (3, 4, 3, NULL, 'EMAIL', 'Order tracking',
+   'Where is my order? / 我的訂單在哪裡?',
+   'en+zh', 'GENERAL', 'NEUTRAL', 'RESOLVED',
    'Shared tracking link; delivered next day.',
    DATEADD('SECOND', 39600, CAST(DATEADD('DAY', -5, CURRENT_DATE) AS TIMESTAMP)),
    DATEADD('SECOND', 40800, CAST(DATEADD('DAY', -5, CURRENT_DATE) AS TIMESTAMP)));
