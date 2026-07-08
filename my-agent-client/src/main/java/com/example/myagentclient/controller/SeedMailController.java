@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -16,6 +17,7 @@ import java.time.Instant;
  * 測試用 Controller：透過 SMTP 將假郵件植入 Mailpit，觸發 Agent 的處理流程。
  * <pre>curl -X POST "http://localhost:8080/seed-mail?subject=退款&amp;body=我的訂單在哪裡？"</pre>
  */
+@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:5174"})
 @RestController
 @RequiredArgsConstructor
 public class SeedMailController {
@@ -36,7 +38,7 @@ public class SeedMailController {
         // 1. 使用 SimpleMailMessage（不需要 MimeMessage），只是模擬一封普通客戶來信，不需自訂標頭
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(from);
-        message.setTo(inbox.address()); // 植入受監控的支援收件匣，InboxMonitor 下次輪詢時會撈到
+        message.setTo(inbox.address()); // 植入受監控的支援收件匣 support@example.com，InboxMonitor 下次輪詢時會撈到
         message.setSubject(subject);
         message.setText(body);
 

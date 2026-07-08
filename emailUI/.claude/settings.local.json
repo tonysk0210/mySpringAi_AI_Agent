@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Path \"D:\\\\IdeaProjects\\\\mySpringAi_AI_Agent\\\\emailUI\" -Recurse -Force | Select-Object FullName | ForEach-Object { $_.FullName.Replace\\(\"D:\\\\IdeaProjects\\\\mySpringAi_AI_Agent\\\\emailUI\\\\\", \"\"\\) } | Sort-Object)"
+    ]
+  }
+}
