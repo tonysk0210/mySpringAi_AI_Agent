@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"D:\\\\Fork\\\\mySpringAi_AI_Agent\\\\mcp-server\" -Recurse -Directory)",
+      "Bash(Select-Object FullName)"
+    ]
+  }
+}
