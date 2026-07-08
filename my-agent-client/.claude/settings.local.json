@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Skill(explain)"
+      "Skill(explain)",
+      "Bash(Get-ChildItem -Path \"D:\\\\Fork\\\\mySpringAi_AI_Agent\\\\my-agent-client\" -Force)",
+      "Bash(Select-Object Name, FullName)",
+      "Bash(Format-Table -AutoSize)"
     ]
   }
 }
