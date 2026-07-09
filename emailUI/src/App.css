@@ -261,10 +261,19 @@
   border-radius: 16px;
 }
 
+.compose-workspace {
+  display: grid;
+  grid-template-columns: minmax(520px, 720px) minmax(280px, 360px);
+  align-items: start;
+  gap: 24px;
+  width: 100%;
+  max-width: 1120px;
+}
+
 /* ── Compose Card ────────────────────────────────── */
 .compose-card {
   padding: 28px 32px;
-  max-width: 720px;
+  width: 100%;
 }
 
 .compose-header {
@@ -394,6 +403,120 @@
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* ── Test Examples ───────────────────────────────── */
+.examples-panel {
+  padding: 20px;
+  width: 100%;
+}
+
+.examples-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+
+  h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-h);
+  }
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    border-radius: 12px;
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 700;
+  }
+}
+
+.example-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.example-item {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+
+  &:hover {
+    background: rgba(170, 59, 255, 0.08);
+    border-color: rgba(170, 59, 255, 0.24);
+    transform: translateY(-1px);
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(170, 59, 255, 0.6);
+    outline-offset: 2px;
+  }
+}
+
+.example-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  border-radius: 50%;
+  background: rgba(170, 59, 255, 0.16);
+  color: #d8b4fe;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.example-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.example-subject {
+  color: var(--text-h);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.example-from {
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.example-body {
+  color: #4b5563;
+  display: -webkit-box;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 /* ── Result Card ─────────────────────────────────── */
@@ -538,8 +661,15 @@
     padding: 20px 16px;
   }
 
+  .compose-workspace {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    max-width: 100%;
+  }
+
   .compose-card,
-  .result-card {
+  .result-card,
+  .examples-panel {
     padding: 20px;
     max-width: 100%;
   }
