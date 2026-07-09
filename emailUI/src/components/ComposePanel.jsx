@@ -7,8 +7,8 @@ const API_BASE = "http://localhost:8080";
 const TEST_EXAMPLES = [
   {
     from: "priya.sharma@example.com",
-    subject: "訂單號 4471 被收了兩次費用",
-    body: "您好，我的訂單編號 4471 被重複扣款了。我發現信用卡上有兩筆 $199.99 的扣款紀錄，請協助退還重複扣款的金額，謝謝。",
+    subject: "訂單號 #4471 被收了兩次費用",
+    body: "您好，我的訂單編號 #4471 被重複扣款了。我發現信用卡上有兩筆 $199.99 的扣款紀錄，請協助退還重複扣款的金額，謝謝。",
     context:
       "寄件人 priya.sharma@example.com 為系統既有顧客（CUSTOMERS.ID = 3）。其所提及的訂單 4471 確實存在於 ORDERS 表（ORDERS.ID = 2），且 PAYMENTS 表中可查到兩筆 ORDER_ID = 2 的付款紀錄，足以佐證重複扣款屬實。",
     purpose:
@@ -32,7 +32,7 @@ const TEST_EXAMPLES = [
     subject: "你們的服務可真好",
     body: "哇，這服務真是太驚人了。我訂單編號 #4502 的 HushMix 手持攪拌機聽起來簡直像一台水泥預拌車，——還真好意思說是物超所值啊。完全不像你們網站上宣稱的那麼『安靜』。幫個忙把這兩個問題都給我處理好，否則下次我就直接去寫差評了，謝謝",
     context:
-      "寄件人 rohan.verma@example.com 為系統既有顧客（CUSTOMERS.ID = 4），來信以反諷語氣投訴訂單 4502（ORDERS.ID = 3）中兩件商品的品質問題：BrewWell 快煮壺使用僅一週即停止加熱，HushMix 手持攪拌機噪音遠超商品描述。信末附帶差評威脅，屬於需優先處理的升級風險案例。",
+      "寄件人 rohan.verma@example.com 為系統既有顧客（CUSTOMERS.ID = 4），來信以反諷語氣投訴訂單 4502（ORDERS.ID = 3）有關品質問題：BrewWell 快煮壺使用僅一週即停止加熱，HushMix 手持攪拌機噪音遠超商品描述。信末附帶差評威脅，屬於需優先處理的升級風險案例。",
     purpose:
       "驗證 Agent 是否能穿透反諷語氣，識別 HushMix 噪音投訴而非將主旨誤判為正面稱讚；測試其是否依序呼叫 check_warranty_by_order_number_and_sku 與 detect_duplicate_charges_by_order_number，並在問題未確認為硬體故障前，以多元選項取代直接退款；最後驗證 log_support_ticket 是否記錄升級風險，並依 CUSTOMERS.PREFERRED_LANGUAGE 選擇回覆語言。",
     expectedResult:
@@ -45,9 +45,9 @@ const TEST_EXAMPLES = [
     context:
       "寄件人 tonysk@example.com 非系統既有顧客，ORDERS 表中無任何訂單紀錄。此為購買前的諮詢信，詢問 ZenFlow 瑜珈墊的保固條款，意在評估是否值得購入。",
     purpose:
-      "驗證 Agent 是否能正確辨識售前諮詢與售後客訴的差異：面對 ORDERS 表中無訂單紀錄的潛在顧客，不應呼叫 check_warranty_by_order_number_and_sku、issue_refund 或 log_support_ticket 等售後工具，而應直接以產品保固政策知識回覆，必要時引導至官方產品頁面或銷售團隊。",
+      "驗證 Agent 是否能正確辨識售前諮詢，不呼叫需要訂單號的 check_warranty_by_order_number_and_sku，也不觸發 issue_refund 或 log_support_ticket 等售後工具；而是直接從產品知識庫取得 ZenFlow 瑜珈墊的保固資訊回覆，並視情況提供商品規格或詢問購買偏好。",
     expectedResult:
-      "Agent 識別來信為售前知識型問題，不查詢 CUSTOMERS 或 ORDERS 表，亦不觸發任何退款流程；直接提供 ZenFlow 瑜珈墊的保固期資訊，並視情況引導客戶至產品頁面或進一步諮詢管道。",
+      "Agent 識別來信為售前知識型問題，直接從產品知識庫提供 ZenFlow 瑜珈墊（SKU: YOGA-08）的保固期（12 個月，自購買日起算）與商品規格；回覆語言與來信語言（中文）一致。不觸發 SUPPORT_TICKETS ( 設定只記錄既有客戶問題 )",
   },
 ];
 
