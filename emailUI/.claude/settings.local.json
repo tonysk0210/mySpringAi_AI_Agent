@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "PowerShell(Get-ChildItem -Path \"D:\\\\IdeaProjects\\\\mySpringAi_AI_Agent\\\\emailUI\" -Recurse -Force | Select-Object FullName | ForEach-Object { $_.FullName.Replace\\(\"D:\\\\IdeaProjects\\\\mySpringAi_AI_Agent\\\\emailUI\\\\\", \"\"\\) } | Sort-Object)"
+      "PowerShell(Get-ChildItem -Path \"D:\\\\IdeaProjects\\\\mySpringAi_AI_Agent\\\\emailUI\" -Recurse -Force | Select-Object FullName | ForEach-Object { $_.FullName.Replace\\(\"D:\\\\IdeaProjects\\\\mySpringAi_AI_Agent\\\\emailUI\\\\\", \"\"\\) } | Sort-Object)",
+      "Bash(Get-ChildItem -Path \"D:\\\\IdeaProjects\\\\mySpringAi_AI_Agent\" -Recurse -Include \"*.java\")",
+      "Bash(Select-Object -ExpandProperty FullName)"
     ]
   }
 }

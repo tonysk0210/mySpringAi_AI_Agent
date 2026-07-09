@@ -9,11 +9,12 @@ const TEST_EXAMPLES = [
     from: "priya.sharma@example.com",
     subject: "訂單號 4471 被收了兩次費用",
     body: "您好，我的訂單編號 4471 被重複扣款了。我發現信用卡上有兩筆 $199.99 的扣款紀錄，請協助退還重複扣款的金額，謝謝。",
-    context: "客戶指出同一筆訂單被信用卡重複扣款，並明確提供訂單編號與金額。",
+    context:
+      "寄件人 priya.sharma@example.com 為系統既有顧客（CUSTOMERS.ID = 3）。其所提及的訂單 4471 確實存在於 ORDERS 表（ORDERS.ID = 2），且 PAYMENTS 表中可查到兩筆 ORDER_ID = 2 的付款紀錄，足以佐證重複扣款屬實。",
     purpose:
-      "測試 Agent 是否能辨識帳務與退款類客服請求，正確擷取訂單編號 4471 與重複扣款金額。",
+      "驗證 Agent 面對明確提供訂單號的帳務投訴時，是否能主動呼叫 detect_duplicate_charges_by_order_number 工具，取得客觀的重複扣款證據，而非單憑客戶描述直接退款；並在確認 duplicateDetected: true 後，以正確的退款類型 DUPLICATE_CHARGE 與金額 $199.99 呼叫 issue_refund，最終透過 log_support_ticket 將完整處理脈絡寫入 SUPPORT_TICKETS。",
     expectedResult:
-      "預期應歸類為退款或帳務問題，回覆需確認會協助查核並處理重複扣款退款。",
+      "issue_refund 成功執行後，PAYMENTS 表中對應的付款紀錄狀態應被沖銷由 CAPTURED 更新為 REFUNDED；REFUNDS 表應新增一筆屬於 Priya（PAYMENT.ORDER_ID = 2）的退款紀錄，金額為 $199.99；最後 SUPPORT_TICKETS 表同步新增一筆本次互動的處理記錄。",
   },
   {
     from: "sarah.mitchell@example.com",
