@@ -20,32 +20,34 @@ const TEST_EXAMPLES = [
     from: "sarah.mitchell@example.com",
     subject: "What's wrong with you guys",
     body: "For the third time in a row, I received a blender with a cracked jug. I no more want to take this stress. Give me my money back.",
-    context: "客戶使用英文抱怨連續三次收到破損果汁機，語氣強烈且要求退款。",
+    context:
+      "寄件人 sarah.mitchell@example.com 為系統既有顧客（CUSTOMERS.ID = 1），且已有三筆訂單紀錄（ORDERS.ID = 1、4、5），均為同款果汁機。前兩次因商品破損申請退貨，PAYMENTS 表中 ORDER_ID = 4 與 5 的付款紀錄狀態皆已更新為 REFUNDED；REFUNDS 與 SUPPORT_TICKETS 亦留有對應的歷史處理紀錄。本次來信為第三度收到破損商品。",
     purpose:
-      "測試 Agent 是否能處理拼字錯誤、負面情緒與明確退款要求，不只依賴主旨判斷。",
+      "驗證 Agent 面對情緒激動、語氣強硬且夾雜非正式用語的投訴信時，是否仍能準確識別退款訴求；並測試其能否主動呼叫 check_warranty_by_order_number_and_sku 工具查詢商品保固狀態，在確認保固有效後以 REFUND_TYPE: WARRANTY 發起退款，而非要求客戶補充資訊或直接拒絕；最後驗證是否依據 CUSTOMERS.PREFERRED_LANGUAGE = EN，自動以英文撰寫回覆郵件。",
     expectedResult:
-      "預期應辨識為高不滿度的商品破損退款案例，回覆需安撫客戶並啟動退款或升級處理。",
+      "Agent 透過 check_warranty_by_order_number_and_sku 確認商品仍在保固期內後，對 ORDERS.ID = 1 發起退款：PAYMENTS 表中 ORDER_ID = 1 的付款紀錄狀態由 CAPTURED 沖銷為 REFUNDED；REFUNDS 表同步新增一筆退款紀錄，REFUND_TYPE 為 WARRANTY；SUPPORT_TICKETS 表 INSERT 一筆本次處理的完整記錄；最後因 CUSTOMERS.PREFERRED_LANGUAGE = EN，Agent 應以英文撰寫回覆郵件。",
   },
   {
     from: "rohan.verma@example.com",
     subject: "你們的服務可真好",
     body: "哇，這服務真是太驚人了。我訂單編號 #4502 的 BrewWell 快煮壺才用『剛好整整一週』就突然不加熱了——還真好意思說是物超所值啊。喔對了，順便提一下你們所謂的『優質』品質，同一個箱子裡的 HushMix 手持攪拌機聽起來簡直像一台水泥預拌車，完全不像你們網站上宣稱的那麼『安靜』。幫個忙把這兩個問題都給我處理好，否則下次我就直接去寫差評了，謝謝",
     context:
-      "客戶用反諷語氣描述同一訂單內兩個商品問題：快煮壺不加熱、手持攪拌機噪音過大。",
+      "寄件人 rohan.verma@example.com 為系統既有顧客，來信以反諷語氣投訴訂單 4502 中兩件商品的品質問題：BrewWell 快煮壺使用僅一週即停止加熱，HushMix 手持攪拌機噪音遠超商品描述。信末附帶差評威脅，屬於需優先處理的升級風險案例。",
     purpose:
-      "測試 Agent 是否能理解諷刺語氣、多商品問題與差評威脅，避免把主旨誤判為正面稱讚。",
+      "驗證 Agent 是否能穿透反諷語氣，正確識別同一封信中多件商品的品質投訴；測試其是否會針對每件商品分別呼叫 check_warranty_by_order_number_and_sku 確認保固狀態，並對保固期內的商品發起 WARRANTY 退款；同時測試 Agent 是否能辨識差評威脅所代表的升級風險，並在 log_support_ticket 記錄中標記，而非將主旨「你們的服務可真好」誤判為正面稱讚。",
     expectedResult:
-      "預期應辨識為品質投訴與升級風險案例，回覆需分別處理 BrewWell 與 HushMix 的問題。",
+      "Agent 識別反諷語氣後，針對 BrewWell 快煮壺與 HushMix 手持攪拌機分別呼叫 check_warranty_by_order_number_and_sku；對確認在保固期內的商品以 REFUND_TYPE: WARRANTY 發起退款，相應 PAYMENTS 紀錄狀態由 CAPTURED 更新為 REFUNDED，REFUNDS 表同步新增退款記錄；最後透過 log_support_ticket 將本次互動寫入 SUPPORT_TICKETS，並於備註中標記差評升級風險。",
   },
   {
     from: "tonysk@example.com",
     subject: "ZenFlow Yoga Mat 的保固相關問題",
     body: "請問 ZenFlow 瑜珈墊的保固期是多久？我目前正在考慮購買...",
-    context: "潛在客戶在購買前詢問 ZenFlow 瑜珈墊的保固資訊。",
+    context:
+      "寄件人 tonysk@example.com 非系統既有顧客，ORDERS 表中無任何訂單紀錄。此為購買前的諮詢信，詢問 ZenFlow 瑜珈墊的保固條款，意在評估是否值得購入。",
     purpose:
-      "測試 Agent 是否能辨識售前知識型問題，而不是誤判為既有訂單或退款案件。",
+      "驗證 Agent 是否能正確辨識售前諮詢與售後客訴的差異：面對 ORDERS 表中無訂單紀錄的潛在顧客，不應呼叫 check_warranty_by_order_number_and_sku、issue_refund 或 log_support_ticket 等售後工具，而應直接以產品保固政策知識回覆，必要時引導至官方產品頁面或銷售團隊。",
     expectedResult:
-      "預期應回覆保固相關資訊，必要時引導客戶查看產品頁或客服政策。",
+      "Agent 識別來信為售前知識型問題，不查詢 CUSTOMERS 或 ORDERS 表，亦不觸發任何退款流程；直接提供 ZenFlow 瑜珈墊的保固期資訊，並視情況引導客戶至產品頁面或進一步諮詢管道。",
   },
 ];
 
