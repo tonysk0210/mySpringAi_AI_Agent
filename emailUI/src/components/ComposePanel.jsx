@@ -30,13 +30,13 @@ const TEST_EXAMPLES = [
   {
     from: "rohan.verma@example.com",
     subject: "你們的服務可真好",
-    body: "哇，這服務真是太驚人了。我訂單編號 #4502 的 BrewWell 快煮壺才用『剛好整整一週』就突然不加熱了——還真好意思說是物超所值啊。喔對了，順便提一下你們所謂的『優質』品質，同一個箱子裡的 HushMix 手持攪拌機聽起來簡直像一台水泥預拌車，完全不像你們網站上宣稱的那麼『安靜』。幫個忙把這兩個問題都給我處理好，否則下次我就直接去寫差評了，謝謝",
+    body: "哇，這服務真是太驚人了。我訂單編號 #4502 的 HushMix 手持攪拌機聽起來簡直像一台水泥預拌車，——還真好意思說是物超所值啊。完全不像你們網站上宣稱的那麼『安靜』。幫個忙把這兩個問題都給我處理好，否則下次我就直接去寫差評了，謝謝",
     context:
-      "寄件人 rohan.verma@example.com 為系統既有顧客，來信以反諷語氣投訴訂單 4502 中兩件商品的品質問題：BrewWell 快煮壺使用僅一週即停止加熱，HushMix 手持攪拌機噪音遠超商品描述。信末附帶差評威脅，屬於需優先處理的升級風險案例。",
+      "寄件人 rohan.verma@example.com 為系統既有顧客（CUSTOMERS.ID = 4），來信以反諷語氣投訴訂單 4502（ORDERS.ID = 3）中兩件商品的品質問題：BrewWell 快煮壺使用僅一週即停止加熱，HushMix 手持攪拌機噪音遠超商品描述。信末附帶差評威脅，屬於需優先處理的升級風險案例。",
     purpose:
-      "驗證 Agent 是否能穿透反諷語氣，正確識別同一封信中多件商品的品質投訴；測試其是否會針對每件商品分別呼叫 check_warranty_by_order_number_and_sku 確認保固狀態，並對保固期內的商品發起 WARRANTY 退款；同時測試 Agent 是否能辨識差評威脅所代表的升級風險，並在 log_support_ticket 記錄中標記，而非將主旨「你們的服務可真好」誤判為正面稱讚。",
+      "驗證 Agent 是否能穿透反諷語氣，識別 HushMix 噪音投訴而非將主旨誤判為正面稱讚；測試其是否依序呼叫 check_warranty_by_order_number_and_sku 與 detect_duplicate_charges_by_order_number，並在問題未確認為硬體故障前，以多元選項取代直接退款；最後驗證 log_support_ticket 是否記錄升級風險，並依 CUSTOMERS.PREFERRED_LANGUAGE 選擇回覆語言。",
     expectedResult:
-      "Agent 識別反諷語氣後，針對 BrewWell 快煮壺與 HushMix 手持攪拌機分別呼叫 check_warranty_by_order_number_and_sku；對確認在保固期內的商品以 REFUND_TYPE: WARRANTY 發起退款，相應 PAYMENTS 紀錄狀態由 CAPTURED 更新為 REFUNDED，REFUNDS 表同步新增退款記錄；最後透過 log_support_ticket 將本次互動寫入 SUPPORT_TICKETS，並於備註中標記差評升級風險。",
+      "Agent 識別反諷語氣後，正確鎖定 HushMix 手持攪拌機（SKU: HMX-50）的噪音投訴，確認商品仍在 12 個月保固期內（到期日 2027-07-04），並確認無重複扣款。由於問題尚未確認為硬體故障，Agent 未直接發起退款，而是提供遠端排查、退回檢測、退款申請等選項供客戶選擇；最後寫入 SUPPORT_TICKETS，並以中文或英文（ CUSTOMERS.PREFERRED_LANGUAGE ）撰寫回覆郵件。",
   },
   {
     from: "tonysk@example.com",

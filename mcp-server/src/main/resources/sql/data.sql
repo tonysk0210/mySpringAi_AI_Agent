@@ -100,7 +100,7 @@ VALUES
       '512 Lakeshore Dr, Chicago, IL 60611, USA',      199.99, 'USD'),
   -- Rohan's order — kettle + hand mixer, the basis for his two complaints.
   (3, '4502', 4, DATEADD('DAY', -6,   CURRENT_DATE), 'DELIVERED',
-      'A-14 Green Park, New Delhi 110016, India',        89.98, 'USD'),
+      'A-14 Green Park, New Delhi 110016, India',        49.99, 'USD'),
   -- Sarah's earlier blender orders (the two PRIOR cracked-jug incidents).
   (4, '3801', 1, DATEADD('DAY', -183, CURRENT_DATE), 'DELIVERED',
       '88 Maple Ave, San Francisco, CA 94110, USA',    129.99, 'USD'),
@@ -117,10 +117,9 @@ KEY (id)
 VALUES
   (1, 1, 1, 1, 129.99),   -- order 4198: AeroBlend 300
   (2, 2, 4, 1, 199.99),   -- order 4471: ChefPro knife set
-  (3, 3, 5, 1, 39.99),    -- order 4502: kettle
-  (4, 3, 3, 1, 49.99),    -- order 4502: hand mixer
-  (5, 4, 1, 1, 129.99),   -- order 3801: AeroBlend 300 (1st failure)
-  (6, 5, 1, 1, 129.99);   -- order 4007: AeroBlend 300 (2nd failure)
+  (3, 3, 3, 1, 49.99),    -- order 4502: hand mixer
+  (4, 4, 1, 1, 129.99),   -- order 3801: AeroBlend 300 (1st failure)
+  (5, 5, 1, 1, 129.99);   -- order 4007: AeroBlend 300 (2nd failure)
 
 ALTER TABLE ORDER_ITEMS ALTER COLUMN id RESTART WITH 100;
 
@@ -138,7 +137,7 @@ VALUES
       DATEADD('SECOND', 36942, CAST(DATEADD('DAY', -9,   CURRENT_DATE) AS TIMESTAMP))),
   (3, 2, 199.99, 'USD', 'CARD', 'TXN-20260602-0189', 'CAPTURED',
       DATEADD('SECOND', 36948, CAST(DATEADD('DAY', -9,   CURRENT_DATE) AS TIMESTAMP))),
-  (4, 3,  89.98, 'USD', 'UPI',  'TXN-20260605-7741', 'CAPTURED',
+  (4, 3,  49.99, 'USD', 'UPI',  'TXN-20260605-7741', 'CAPTURED',
       DATEADD('SECOND', 30125, CAST(DATEADD('DAY', -6,   CURRENT_DATE) AS TIMESTAMP))),
   (5, 4, 129.99, 'USD', 'CARD', 'TXN-20251210-0044', 'REFUNDED',
       DATEADD('SECOND', 43200, CAST(DATEADD('DAY', -183, CURRENT_DATE) AS TIMESTAMP))),
