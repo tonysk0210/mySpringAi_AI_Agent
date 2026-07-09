@@ -26,35 +26,35 @@
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         emailUI (port 5173)                     │
-│              React 19 + Vite 測試介面                            │
-│         注入測試信件 / 查看代理回應結果                            │
+│              React 19 + Vite 測試介面                          	  │
+│         注入測試信件 / 查看代理回應結果                          	  │
 └──────────────────────────────┬──────────────────────────────────┘
                                │ POST /seed-mail
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │               my-agent-client (port 8080)                       │
 │                                                                 │
-│  InboxMonitor (每 10 秒輪詢)                                     │
+│  InboxMonitor (每 10 秒輪詢)                                	  │
 │       │                                                         │
 │       ▼                                                         │
-│  SupportAgent ──── OpenAI LLM ──── MCP Tool Loop               │
+│  SupportAgent ──── OpenAI LLM ──── MCP Tool Loop                │
 │       │                                 │                       │
 │       ▼                                 │                       │
-│  SupportMailSender (SMTP 回覆)          │                       │
+│  SupportMailSender (SMTP 回覆)     	  │                       │
 └─────────────────────────────────────────┼───────────────────────┘
                                           │ MCP Streamable HTTP
                                           ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                  mcp-server (port 8090)                         │
 │                                                                 │
-│  QueryTools (8 個唯讀工具)  +  ActionTools (2 個寫入工具)         │
+│  QueryTools (8 個唯讀工具)  +  ActionTools (2 個寫入工具)     	  │
 │                                                                 │
 │              H2 File-based Database (./h2db/)                   │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
 │               Mailpit Docker Container                          │
-│    SMTP :1025 (接收測試信件)  +  HTTP API :8025 (UI / 輪詢)      │
+│    SMTP :1025 (接收測試信件)  +  HTTP API :8025 (UI / 輪詢)   	  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -247,7 +247,7 @@ emailUI/src/
 | 情境 | 寄件人 | 測試目的 |
 |------|--------|---------|
 | 重複扣款 | priya.sharma@example.com | 偵測同一訂單兩筆 CAPTURED 付款 |
-| 第三次故障補償 | sarah.mitchell@example.com | 識別歷史紀錄並給予善意退款 |
+| 保固內退款 | sarah.mitchell@example.com | 確認在保固期內並執行退款 |
 | 多語言諷刺投訴 | rohan.verma@example.com | 穿透諷刺語氣、多語言偵測 |
 | 售前保固詢問 | tonysk@example.com | 查詢產品規格，無需建立工單 |
 
@@ -293,7 +293,7 @@ SUPPORT_TICKETS (id, customer_id→, order_id→, product_id→, channel,
 
 | 客戶 | Email | 訂單 | 測試場景 |
 |------|-------|------|---------|
-| Sarah Mitchell | sarah.mitchell@example.com | 4198, 3801, 4007（均為 AeroBlend 300） | 前兩張已退款，第三張觸發善意補償 |
+| Sarah Mitchell | sarah.mitchell@example.com | 4198, 3801, 4007（均為 AeroBlend 300） | 觸發保固內退款 |
 | Priya Sharma | priya.sharma@example.com | 4471（ChefPro 刀具組） | 同訂單有兩筆 CAPTURED 付款 |
 | Rohan Verma | rohan.verma@example.com | 4502（手持攪拌機 + 電熱水壺） | 諷刺語氣、中英混雜 |
 | James Cooper | james.cooper@example.com | 無 | — |
@@ -364,6 +364,7 @@ SUPPORT_TICKETS (id, customer_id→, order_id→, product_id→, channel,
 `http://localhost:8080/h2-console`
 - JDBC URL: `jdbc:h2:file:./h2db/mcpserverdb`
 - Username: `sa`（預設）
+- Password: 無
 
 ---
 
@@ -387,9 +388,9 @@ cd mcp-server
 ```
 
 **2. 啟動 Mailpit**
+
+啟動 mcp-server 時會自動啟動 Mailpit（透過 Docker Compose）。
 ```bash
-cd my-agent-client
-docker compose up -d
 # 驗證：http://localhost:8025
 ```
 
@@ -453,24 +454,25 @@ curl -X POST "http://localhost:8080/seed-mail" \
 4. `issue_refund(4471, 199.99, DUPLICATE_CHARGE, ...)` → 退款成功
 5. `log_support_ticket(intent=BILLING_ISSUE, sentiment=NEGATIVE)`
 
-### 情境 2：第三次故障善意補償
+### 情境 2：保固內退款
 
 **寄件人：** sarah.mitchell@example.com
-**情境：** 第三台 AeroBlend 300 故障
+**情境：** AeroBlend 300 故障，申請退款
 **預期流程：**
-1. 查詢客戶 + 訂單紀錄
-2. `get_customer_ticket_history_by_email` → 發現前兩次已退款紀錄
-3. 識別重複故障模式，主動提供善意退款（GOODWILL）
-4. `log_support_ticket(intent=COMPLAINT)`
+1. `lookup_customer_by_email` → 識別 Sarah
+2. `get_customer_orders_by_email` → 取得訂單紀錄
+3. `check_warranty_by_order_number_and_sku` → 確認產品仍在保固期內
+4. `issue_refund(..., WARRANTY, ...)` → 執行保固退款
+5. `log_support_ticket(intent=WARRANTY_CLAIM)`
 
-### 情境 3：多語言諷刺投訴
+### 情境 3：多語言諷刺投訴（請求進一步佐證）
 
 **寄件人：** rohan.verma@example.com
 **情境：** 中英混雜、充滿諷刺語氣的雜音投訴
 **預期流程：**
 1. 穿透諷刺語氣，識別為保固申訴
 2. `check_warranty_by_order_number_and_sku` → 確認在保固期內
-3. 提供維修/退換/退款多種選擇
+3. 因尚未確認實際故障狀況，**不直接核發退款**，改為請客戶提供進一步佐證（如影片或照片）
 4. `log_support_ticket(intent=WARRANTY_CLAIM, sentiment=NEGATIVE, detectedLanguage="en+zh")`
 
 ### 情境 4：售前產品諮詢
