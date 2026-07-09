@@ -10,7 +10,8 @@
       "Bash(docker context ls *)",
       "Bash(docker --context desktop-linux compose -f \"D:\\\\Fork\\\\mySpringAi_AI_Agent\\\\my-agent-client\\\\compose.yaml\" up -d)",
       "Bash(echo \"EXIT:$?\")",
-      "PowerShell(docker info *)"
+      "PowerShell(docker info *)",
+      "Bash(git -C \"D:\\\\IdeaProjects\\\\mySpringAi_AI_Agent\" status --short)"
     ]
   }
 }
