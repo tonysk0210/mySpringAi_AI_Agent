@@ -54,7 +54,8 @@ public class SeedMailController {
     }
 
     /**
-     * 植入嘗試的結果；{@code body} 僅成功時有值，{@code error} 僅失敗時有值。
+     * 植入嘗試的結果；{@code body} 僅成功時有值，{@code error} 僅失敗時有值。emailUI 的 history useState 結構
+     * SeedResult - static nested record
      */
     public record SeedResult(
             String status,

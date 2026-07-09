@@ -47,6 +47,7 @@ export default function Sidebar({ history, selected, onSelect }) {
             >
               {/* 2-3. 顯示寄件人縮寫、寄件人、主旨、寄信時間 */}
               <div className={`avatar avatar-${item.status}`}>
+                {/* email 的前兩個字母 */}
                 {getInitials(item.from)}
               </div>
               <div className="email-meta">
@@ -56,6 +57,7 @@ export default function Sidebar({ history, selected, onSelect }) {
                 </div>
               </div>
               <div className="email-time">
+                {/* 顯示相對時間 */}
                 {formatRelativeTime(item.timestamp)}
               </div>
             </li>

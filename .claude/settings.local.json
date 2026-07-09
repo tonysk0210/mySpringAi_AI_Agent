@@ -9,7 +9,8 @@
       "Bash(docker-compose up *)",
       "Bash(docker context ls *)",
       "Bash(docker --context desktop-linux compose -f \"D:\\\\Fork\\\\mySpringAi_AI_Agent\\\\my-agent-client\\\\compose.yaml\" up -d)",
-      "Bash(echo \"EXIT:$?\")"
+      "Bash(echo \"EXIT:$?\")",
+      "PowerShell(docker info *)"
     ]
   }
 }
