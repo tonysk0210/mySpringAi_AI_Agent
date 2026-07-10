@@ -507,7 +507,7 @@ SUPPORT_TICKETS (id, customer_id→, order_id→, product_id→, channel,
 | `PUT` | `/api/v1/message/{id}/read` | 標記為已讀 |
 | `GET` | `/` | Web UI |
 
-### H2 Console（port 8080）
+### H2 Console（port 8090）
 
 `http://localhost:8090/h2-console`
 - JDBC URL: `jdbc:h2:file:./h2db/mcpserverdb`
