@@ -16,6 +16,7 @@
 - [MCP 工具清單](#mcp-工具清單)
 - [API 端點](#api-端點)
 - [快速開始](#快速開始)
+- [Demo 流程](#demo-流程)
 - [測試情境](#測試情境)
 - [設計原則](#設計原則)
 
@@ -295,7 +296,7 @@ SUPPORT_TICKETS (id, customer_id→, order_id→, product_id→, channel,
 |------|-------|------|---------|
 | Sarah Mitchell | sarah.mitchell@example.com | 4198, 3801, 4007（均為 AeroBlend 300） | 觸發保固內退款 |
 | Priya Sharma | priya.sharma@example.com | 4471（ChefPro 刀具組） | 同訂單有兩筆 CAPTURED 付款 |
-| Rohan Verma | rohan.verma@example.com | 4502（手持攪拌機 + 電熱水壺） | 諷刺語氣、中英混雜 |
+| Rohan Verma | rohan.verma@example.com | 4502（手持攪拌器） | 諷刺語氣、中英混雜 |
 | James Cooper | james.cooper@example.com | 無 | — |
 
 ---
@@ -374,7 +375,7 @@ SUPPORT_TICKETS (id, customer_id→, order_id→, product_id→, channel,
 
 - Java 25+
 - Maven（或使用 `./mvnw`）
-- Docker（Mailpit）
+- Docker Desktop（Mailpit）
 - Node.js 20+
 - `OPENAI_API_KEY` 環境變數
 
@@ -387,14 +388,7 @@ cd mcp-server
 # 驗證：http://localhost:8090/
 ```
 
-**2. 啟動 Mailpit**
-
-啟動 mcp-server 時會自動啟動 Mailpit（透過 Docker Compose）。
-```bash
-# 驗證：http://localhost:8025
-```
-
-**3. 啟動 Agent Client**
+**2. 啟動 Agent Client**
 ```bash
 # 確認已設定環境變數
 export OPENAI_API_KEY=sk-...   # Linux/macOS
@@ -405,6 +399,13 @@ cd my-agent-client
 # 驗證：http://localhost:8080
 ```
 
+**3. 啟動 Mailpit**
+
+啟動 Agent Client 時會自動啟動 Mailpit（透過 Docker Compose），請先確認 Docker Desktop 已開啟。
+```bash
+# 驗證：http://localhost:8025
+```
+
 **4. 啟動前端**
 ```bash
 cd emailUI
@@ -413,31 +414,47 @@ npm run dev
 # 開啟：http://localhost:5173
 ```
 
-### 建置與測試指令
+---
 
-```bash
-# MCP Server
-cd mcp-server
-./mvnw test                    # 執行測試
-./mvnw package -DskipTests     # 建置 JAR
+## Demo 流程
 
-# Agent Client
-cd my-agent-client
-./mvnw test
-./mvnw package -DskipTests
+以下為一個完整的 Demo Cycle，展示從客戶發信到 AI 自動回覆的端對端流程。
 
-# 前端
-cd emailUI
-npm run lint                   # ESLint 檢查
-npm run build                  # 生產建置至 dist/
-npm run preview                # 預覽生產建置
+### 步驟 1 — 前端模擬客戶發信
 
-# 手動注入測試信件（不開啟前端）
-curl -X POST "http://localhost:8080/seed-mail" \
-  -G --data-urlencode 'from=priya.sharma@example.com' \
-  --data-urlencode 'subject=Double Charged!' \
-  --data-urlencode 'body=I was charged twice for order 4471'
-```
+開啟 **http://localhost:5173**（emailUI 前端介面）。
+
+選擇預設測試情境或自行填寫表單，點擊送出後，系統會將信件透過 `POST /seed-mail` 注入 Mailpit SMTP，模擬客戶寄信至 `support@example.com` 的完整流程。
+
+### 步驟 2 — Mailpit 模擬客服信箱收件
+
+開啟 **http://localhost:8025**（Mailpit Web UI）。
+
+Mailpit 作為虛擬客服信箱，攔截所有發往 `support@example.com` 的信件。可在此檢視原始信件內容、寄件人、主旨等資訊。
+
+`InboxMonitor` 每 10 秒透過 Mailpit HTTP API 輪詢未讀信件，發現新信後立即交由 Agent Client 處理，並將信件標記為已讀，避免重複處理。
+
+### 步驟 3 — 觀察 Agent Client Console 的 LLM 處理過程
+
+在 **my-agent-client** 的 Console 中，可透過 `PrettyLoggerAdvisor` 輸出的格式化日誌，逐步觀察 LLM 的完整決策過程：
+
+- **SYSTEM**：系統提示詞（代理角色與規則）
+- **USER**：傳入的客戶信件內容
+- **TOOL_CALL**：LLM 決定呼叫的 MCP 工具與參數（如 `lookup_customer_by_email`、`issue_refund` 等）
+- **TOOL_RESPONSE**：MCP Server 回傳的查詢或操作結果
+- **ASSISTANT**：LLM 最終生成的 `AgentResponse`（客戶回覆 + 內部摘要）
+
+`TokenUsageAuditAdvisor` 同時記錄每次 LLM 呼叫的 input / output token 用量。
+
+### 步驟 4 — Mailpit 攔截 AI 自動回覆信件
+
+回到 **http://localhost:8025**，可在 Mailpit 收件匣中看到 Agent Client 透過 SMTP 寄出的自動回覆信件，包含：
+
+- 正確的 `In-Reply-To` 與 `References` 標頭（確保郵件串接）
+- LLM 生成的回覆正文（使用客戶偵測到的語言）
+- 原始信件以 `> ` 引用格式附於信末
+
+至此完成一個完整的 **Demo Cycle**：客戶發信 → 信件進入信箱 → LLM 自主分析並操作工具 → 自動回覆客戶。
 
 ---
 
@@ -483,7 +500,6 @@ curl -X POST "http://localhost:8080/seed-mail" \
 1. `lookup_customer_by_email` → 未找到客戶（售前場景）
 2. `search_products_by_name_or_sku("yoga mat")` → 找到產品
 3. 回覆產品保固資訊
-4. 視情況決定是否記錄工單
 
 ---
 

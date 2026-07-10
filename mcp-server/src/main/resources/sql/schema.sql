@@ -1,20 +1,20 @@
 -- =============================================================================
--- Support Agent — schema (H2-compatible)
+-- Support Agent — Schema（H2 相容）
 --
--- Changes from the MySQL original:
---   • Removed CREATE DATABASE / USE — H2 uses the JDBC URL database
---   • Removed ENGINE=InnoDB / CHARSET / COLLATE — not supported in H2
---   • ENUM(…) → VARCHAR(n) CHECK (col IN (…)) — portable constraint
---   • Inline KEY declarations moved to standalone CREATE INDEX statements
+-- 與 MySQL 原始版本的差異：
+--   • 移除 CREATE DATABASE / USE — H2 使用 JDBC URL 指定資料庫
+--   • 移除 ENGINE=InnoDB / CHARSET / COLLATE — H2 不支援
+--   • ENUM(…) → VARCHAR(n) CHECK (col IN (…)) — 可攜式約束寫法
+--   • 內嵌 KEY 宣告改為獨立的 CREATE INDEX 語句
 --   • UNIQUE KEY name (col) → CONSTRAINT name UNIQUE (col)
---   • CREATE TABLE IF NOT EXISTS for idempotent startup init
---   • All table names are UPPERCASE to match @Table(name=…) in JPA entities
+--   • 使用 CREATE TABLE IF NOT EXISTS 確保啟動初始化冪等性
+--   • 所有資料表名稱大寫以符合 JPA 實體中的 @Table(name=…)
 -- =============================================================================
 
 DROP ALL OBJECTS;
 
 -- ---------------------------------------------------------------------------
--- Customers
+-- 顧客
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS CUSTOMERS (
     id                 BIGINT       NOT NULL AUTO_INCREMENT,
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS CUSTOMERS (
 );
 
 -- ---------------------------------------------------------------------------
--- Products
+-- 商品
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS PRODUCTS (
     id              BIGINT         NOT NULL AUTO_INCREMENT,
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS PRODUCTS (
 );
 
 -- ---------------------------------------------------------------------------
--- Orders
+-- 訂單
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS ORDERS (
     id               BIGINT        NOT NULL AUTO_INCREMENT,
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS ORDERS (
 CREATE INDEX IF NOT EXISTS idx_orders_customer ON ORDERS (customer_id);
 
 -- ---------------------------------------------------------------------------
--- Order line items (an order can contain several products)
+-- 訂單明細（一筆訂單可包含多項商品）
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS ORDER_ITEMS (
     id         BIGINT        NOT NULL AUTO_INCREMENT,
@@ -87,9 +87,9 @@ CREATE INDEX IF NOT EXISTS idx_items_order   ON ORDER_ITEMS (order_id);
 CREATE INDEX IF NOT EXISTS idx_items_product ON ORDER_ITEMS (product_id);
 
 -- ---------------------------------------------------------------------------
--- Payments / charges
--- One order can have MORE THAN ONE captured payment row — that is precisely
--- how the agent spots a duplicate charge ("charged twice for order #4471").
+-- 付款 / 費用
+-- 一筆訂單可有多筆已授權付款記錄 — 這正是
+-- 代理識別重複收費的依據（「訂單 #4471 被收費兩次」）。
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS PAYMENTS (
     id              BIGINT        NOT NULL AUTO_INCREMENT,
@@ -109,7 +109,7 @@ CREATE TABLE IF NOT EXISTS PAYMENTS (
 CREATE INDEX IF NOT EXISTS idx_payments_order ON PAYMENTS (order_id);
 
 -- ---------------------------------------------------------------------------
--- Refunds — the resolution the agent writes back when it takes action
+-- 退款 — 代理執行動作後寫回的處理結果
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS REFUNDS (
     id          BIGINT        NOT NULL AUTO_INCREMENT,
@@ -131,8 +131,8 @@ CREATE TABLE IF NOT EXISTS REFUNDS (
 CREATE INDEX IF NOT EXISTS idx_refunds_order ON REFUNDS (order_id);
 
 -- ---------------------------------------------------------------------------
--- Support tickets — log of every inbound email + what the agent did.
--- Doubles as the HISTORY the agent reads to recognise a repeat failure.
+-- 客服工單 — 所有來信及代理處理結果的記錄。
+-- 同時作為代理讀取的歷史記錄，用以識別重複性故障。
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS SUPPORT_TICKETS (
     id                BIGINT      NOT NULL AUTO_INCREMENT,

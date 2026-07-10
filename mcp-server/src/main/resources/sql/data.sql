@@ -1,27 +1,27 @@
 -- =============================================================================
--- Support Agent — demo / dummy data (H2-compatible)
+-- Support Agent — 示範 / 測試資料（H2 相容）
 --
--- Scenarios:
---   1. Sarah  — blender with a cracked jug, THIRD time -> goodwill refund.
---   2. (any)  — pre-sales "X200 on European voltage?" -> answer from products.
---   3. Priya  — "charged twice for order #4471"  -> duplicate payment, refund 1.
---   4. Rohan  — sarcastic, half-Hindi, two issues -> multilingual + multi-intent.
+-- 情境說明：
+--   1. Sarah  — 攪拌機壺身破裂，第三次 -> 善意退款。
+--   2. （任意）— 售前詢問「X200 支援歐洲電壓？」-> 由商品資料回答。
+--   3. Priya  — 「訂單 #4471 重複收費」-> 重複付款，退還一筆。
+--   4. Rohan  — 語帶諷刺、中英混雜，兩個問題 -> 多語言 + 多意圖。
 --
--- All dates stay relative to CURRENT_DATE so scenarios remain valid on any run.
+-- 所有日期相對 CURRENT_DATE 計算，確保每次執行情境均有效。
 --
--- H2 changes from MySQL original:
---   • Removed USE mydatabase
+-- H2 與 MySQL 原始版本的差異：
+--   • 移除 USE mydatabase
 --   • TIMESTAMP(CURDATE() - INTERVAL n DAY, 'HH:MM:SS')
 --       → DATEADD('SECOND', <seconds>, CAST(DATEADD('DAY', -n, CURRENT_DATE) AS TIMESTAMP))
 --   • CURDATE() - INTERVAL n DAY  → DATEADD('DAY', -n, CURRENT_DATE)
---   • JSON_OBJECT('k',v,…)        → plain JSON string literals
---   • INSERT INTO … → MERGE INTO … KEY(id) for idempotent restarts
---   • ALTER TABLE … RESTART WITH 100 keeps AUTO_INCREMENT safe after seeding
---   • All table names are UPPERCASE to match @Table(name=…) in JPA entities
+--   • JSON_OBJECT('k',v,…)        → 純 JSON 字串字面值
+--   • INSERT INTO … → MERGE INTO … KEY(id)，確保重啟冪等性
+--   • ALTER TABLE … RESTART WITH 100 確保 AUTO_INCREMENT 不與種子資料衝突
+--   • 所有資料表名稱大寫以符合 JPA 實體中的 @Table(name=…)
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
--- Customers
+-- 顧客
 -- ---------------------------------------------------------------------------
 MERGE INTO CUSTOMERS (id, full_name, email, phone, preferred_language, loyalty_tier, created_at)
 KEY (id)
@@ -38,7 +38,7 @@ VALUES
 ALTER TABLE CUSTOMERS ALTER COLUMN id RESTART WITH 100;
 
 -- ---------------------------------------------------------------------------
--- Products
+-- 商品
 -- ---------------------------------------------------------------------------
 MERGE INTO PRODUCTS (id, sku, name, description, category, price, currency, specifications, warranty_months, stock_quantity)
 KEY (id)
@@ -87,21 +87,21 @@ VALUES
 ALTER TABLE PRODUCTS ALTER COLUMN id RESTART WITH 100;
 
 -- ---------------------------------------------------------------------------
--- Orders
+-- 訂單
 -- ---------------------------------------------------------------------------
 MERGE INTO ORDERS (id, order_number, customer_id, order_date, status, shipping_address, total_amount, currency)
 KEY (id)
 VALUES
-  -- Sarah's latest blender — delivered, well inside the 24-month warranty.
+  -- Sarah 最新訂單的攪拌機 — 已送達，在 24 個月保固期內。
   (1, '4198', 1, DATEADD('DAY', -22,  CURRENT_DATE), 'DELIVERED',
       '88 Maple Ave, San Francisco, CA 94110, USA',    129.99, 'USD'),
-  -- Priya's knife set — the order she says was charged twice.
+  -- Priya 的刀具組 — 她反映被重複收費的訂單。
   (2, '4471', 3, DATEADD('DAY', -9,   CURRENT_DATE), 'PAID',
       '512 Lakeshore Dr, Chicago, IL 60611, USA',      199.99, 'USD'),
-  -- Rohan's order — kettle + hand mixer, the basis for his two complaints.
+  -- Rohan 的訂單 — 電熱水壺 + 手持攪拌機，兩個投訴的依據。
   (3, '4502', 4, DATEADD('DAY', -6,   CURRENT_DATE), 'DELIVERED',
       'A-14 Green Park, New Delhi 110016, India',        49.99, 'USD'),
-  -- Sarah's earlier blender orders (the two PRIOR cracked-jug incidents).
+  -- Sarah 較早期的攪拌機訂單（前兩次壺身破裂事件）。
   (4, '3801', 1, DATEADD('DAY', -183, CURRENT_DATE), 'DELIVERED',
       '88 Maple Ave, San Francisco, CA 94110, USA',    129.99, 'USD'),
   (5, '4007', 1, DATEADD('DAY', -101, CURRENT_DATE), 'DELIVERED',
@@ -110,23 +110,23 @@ VALUES
 ALTER TABLE ORDERS ALTER COLUMN id RESTART WITH 100;
 
 -- ---------------------------------------------------------------------------
--- Order line items
+-- 訂單明細
 -- ---------------------------------------------------------------------------
 MERGE INTO ORDER_ITEMS (id, order_id, product_id, quantity, unit_price)
 KEY (id)
 VALUES
-  (1, 1, 1, 1, 129.99),   -- order 4198: AeroBlend 300
-  (2, 2, 4, 1, 199.99),   -- order 4471: ChefPro knife set
-  (3, 3, 3, 1, 49.99),    -- order 4502: hand mixer
-  (4, 4, 1, 1, 129.99),   -- order 3801: AeroBlend 300 (1st failure)
-  (5, 5, 1, 1, 129.99);   -- order 4007: AeroBlend 300 (2nd failure)
+  (1, 1, 1, 1, 129.99),   -- 訂單 4198：AeroBlend 300
+  (2, 2, 4, 1, 199.99),   -- 訂單 4471：ChefPro 刀具組
+  (3, 3, 3, 1, 49.99),    -- 訂單 4502：手持攪拌機
+  (4, 4, 1, 1, 129.99),   -- 訂單 3801：AeroBlend 300（第一次損壞）
+  (5, 5, 1, 1, 129.99);   -- 訂單 4007：AeroBlend 300（第二次損壞）
 
 ALTER TABLE ORDER_ITEMS ALTER COLUMN id RESTART WITH 100;
 
 -- ---------------------------------------------------------------------------
--- Payments
--- Order 4471 (Priya) has TWO captured charges — the classic duplicate charge.
--- Explicit ids are required because refunds reference payment_id 5 and 6.
+-- 付款
+-- 訂單 4471（Priya）有兩筆已授權費用 — 典型重複收費案例。
+-- 明確指定 id，因為退款記錄會引用 payment_id 5 與 6。
 -- ---------------------------------------------------------------------------
 MERGE INTO PAYMENTS (id, order_id, amount, currency, payment_method, transaction_ref, status, charged_at)
 KEY (id)
@@ -147,9 +147,9 @@ VALUES
 ALTER TABLE PAYMENTS ALTER COLUMN id RESTART WITH 100;
 
 -- ---------------------------------------------------------------------------
--- Refunds — historical record of the two earlier blender replacements/refunds.
--- (The 3rd-time Sarah refund and the 4471 duplicate refund are created at
---  runtime by the agent — they are intentionally absent here.)
+-- 退款 — 前兩次攪拌機更換／退款的歷史記錄。
+-- （Sarah 第三次退款及 4471 重複收費退款由代理在執行時建立，
+--  此處刻意不預填。）
 -- ---------------------------------------------------------------------------
 MERGE INTO REFUNDS (id, order_id, payment_id, amount, currency, reason, refund_type, status, created_at)
 KEY (id)
@@ -162,28 +162,28 @@ VALUES
 ALTER TABLE REFUNDS ALTER COLUMN id RESTART WITH 100;
 
 -- ---------------------------------------------------------------------------
--- Support tickets — prior history so the agent can SEE this is a repeat.
+-- 客服工單 — 歷史記錄，讓代理識別此為重複事件。
 -- ---------------------------------------------------------------------------
 MERGE INTO SUPPORT_TICKETS
   (id, customer_id, order_id, product_id, channel, subject, raw_message,
    detected_language, intent, sentiment, status, resolution, created_at, resolved_at)
 KEY (id)
 VALUES
-  -- Sarah, incident #1
+  -- Sarah，第一次事件
   (1, 1, 4, 1, 'EMAIL', 'Blender jug arrived cracked',
    'Hi, my new AeroBlend blender arrived with a crack along the jug. Can you help?',
    'en', 'WARRANTY_CLAIM', 'NEGATIVE', 'RESOLVED',
    'Replacement unit shipped + full refund processed (goodwill).',
    DATEADD('SECOND', 33120, CAST(DATEADD('DAY', -178, CURRENT_DATE) AS TIMESTAMP)),
    DATEADD('SECOND', 36300, CAST(DATEADD('DAY', -175, CURRENT_DATE) AS TIMESTAMP))),
-  -- Sarah, incident #2
+  -- Sarah，第二次事件
   (2, 1, 5, 1, 'EMAIL', 'Cracked jug AGAIN',
    'This is the second time the jug has cracked. Getting frustrated.',
    'en', 'WARRANTY_CLAIM', 'ANGRY', 'RESOLVED',
    'Second replacement shipped + refund processed. Flagged product quality issue.',
    DATEADD('SECOND', 67200, CAST(DATEADD('DAY', -98, CURRENT_DATE) AS TIMESTAMP)),
    DATEADD('SECOND', 52500, CAST(DATEADD('DAY', -94, CURRENT_DATE) AS TIMESTAMP))),
-  -- Rohan, an earlier minor query (so he is a known customer)
+  -- Rohan，較早期的一次小問題（確認為已知顧客）
   (3, 4, 3, NULL, 'EMAIL', 'Order tracking',
    'Where is my order? / 我的訂單在哪裡?',
    'en+zh', 'GENERAL', 'NEUTRAL', 'RESOLVED',
