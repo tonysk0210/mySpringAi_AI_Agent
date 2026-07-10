@@ -75,7 +75,7 @@ npm run dev
 
 ### 步驟 1 — 確認 H2 資料庫成功建立
 
-開啟 **http://localhost:8080/h2-console** 以確認 mcp-server 的資料庫已正確初始化。
+開啟 **http://localhost:8090/h2-console** 以確認 mcp-server 的資料庫已正確初始化。
 
 登入資訊：
 - **JDBC URL：** `jdbc:h2:file:./h2db/mcpserverdb`
@@ -507,7 +507,7 @@ SUPPORT_TICKETS (id, customer_id→, order_id→, product_id→, channel,
 
 ### H2 Console（port 8080）
 
-`http://localhost:8080/h2-console`
+`http://localhost:8090/h2-console`
 - JDBC URL: `jdbc:h2:file:./h2db/mcpserverdb`
 - Username: `sa`（預設）
 - Password: 無
