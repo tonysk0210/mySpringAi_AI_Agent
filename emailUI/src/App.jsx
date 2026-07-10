@@ -39,7 +39,7 @@ function App() {
       <header className="app-header">
         <div className="app-logo">
           <span className="logo-icon">🐋</span>
-          <span className="logo-title">Email Agent Tester</span>
+          <span className="logo-title">種子信件 Simulator</span>
         </div>
         <div className={`status-indicator ${statusClass}`}>
           <span className="status-dot" />
