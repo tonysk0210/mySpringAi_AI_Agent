@@ -6,6 +6,9 @@
 
 ## 目錄
 
+- [快速開始](#快速開始)
+- [Demo 流程](#demo-流程)
+- [測試情境](#測試情境)
 - [系統架構](#系統架構)
 - [技術堆疊](#技術堆疊)
 - [模組說明](#模組說明)
@@ -15,10 +18,141 @@
 - [資料模型](#資料模型)
 - [MCP 工具清單](#mcp-工具清單)
 - [API 端點](#api-端點)
-- [快速開始](#快速開始)
-- [Demo 流程](#demo-流程)
-- [測試情境](#測試情境)
 - [設計原則](#設計原則)
+
+---
+
+## 快速開始
+
+### 前置條件
+
+- Java 25+
+- Maven（或使用 `./mvnw`）
+- Docker Desktop（Mailpit）
+- Node.js 20+
+- `OPENAI_API_KEY` 環境變數
+
+### 啟動步驟
+
+**1. 啟動 MCP Server**
+```bash
+cd mcp-server
+./mvnw spring-boot:run
+# 驗證：http://localhost:8090/
+```
+
+**2. 啟動 Agent Client**
+```bash
+# 確認已設定環境變數
+export OPENAI_API_KEY=sk-...   # Linux/macOS
+$env:OPENAI_API_KEY="sk-..."   # PowerShell
+
+cd my-agent-client
+./mvnw spring-boot:run
+# 驗證：http://localhost:8080
+```
+
+**3. 啟動 Mailpit**
+
+啟動 Agent Client 時會自動啟動 Mailpit（透過 Docker Compose），請先確認 Docker Desktop 已開啟。
+```bash
+# 驗證：http://localhost:8025
+```
+
+**4. 啟動前端**
+```bash
+cd emailUI
+npm install
+npm run dev
+# 開啟：http://localhost:5173
+```
+
+---
+
+## Demo 流程
+
+以下為一個完整的 Demo Cycle，展示從客戶發信到 AI 自動回覆的端對端流程。
+
+### 步驟 1 — 前端模擬客戶發信
+
+開啟 **http://localhost:5173**（emailUI 前端介面）。
+
+選擇預設測試情境或自行填寫表單，點擊送出後，系統會將信件透過 `POST /seed-mail` 注入 Mailpit SMTP，模擬客戶寄信至 `support@example.com` 的完整流程。
+
+### 步驟 2 — Mailpit 模擬客服信箱收件
+
+開啟 **http://localhost:8025**（Mailpit Web UI）。
+
+Mailpit 作為虛擬客服信箱，攔截所有發往 `support@example.com` 的信件。可在此檢視原始信件內容、寄件人、主旨等資訊。
+
+`InboxMonitor` 每 10 秒透過 Mailpit HTTP API 輪詢未讀信件，發現新信後立即交由 Agent Client 處理，並將信件標記為已讀，避免重複處理。
+
+### 步驟 3 — 觀察 Agent Client Console 的 LLM 處理過程
+
+在 **my-agent-client** 的 Console 中，可透過 `PrettyLoggerAdvisor` 輸出的格式化日誌，逐步觀察 LLM 的完整決策過程：
+
+- **SYSTEM**：系統提示詞（代理角色與規則）
+- **USER**：傳入的客戶信件內容
+- **TOOL_CALL**：LLM 決定呼叫的 MCP 工具與參數（如 `lookup_customer_by_email`、`issue_refund` 等）
+- **TOOL_RESPONSE**：MCP Server 回傳的查詢或操作結果
+- **ASSISTANT**：LLM 最終生成的 `AgentResponse`（客戶回覆 + 內部摘要）
+
+`TokenUsageAuditAdvisor` 同時記錄每次 LLM 呼叫的 input / output token 用量。
+
+### 步驟 4 — Mailpit 攔截 AI 自動回覆信件
+
+回到 **http://localhost:8025**，可在 Mailpit 收件匣中看到 Agent Client 透過 SMTP 寄出的自動回覆信件，包含：
+
+- 正確的 `In-Reply-To` 與 `References` 標頭（確保郵件串接）
+- LLM 生成的回覆正文（使用客戶偵測到的語言）
+- 原始信件以 `> ` 引用格式附於信末
+
+至此完成一個完整的 **Demo Cycle**：客戶發信 → 信件進入信箱 → LLM 自主分析並操作工具 → 自動回覆客戶。
+
+---
+
+## 測試情境
+
+### 情境 1：重複扣款退款
+
+**寄件人：** priya.sharma@example.com
+**情境：** 訂單 #4471 被扣款兩次（各 $199.99）
+**預期流程：**
+1. `lookup_customer_by_email` → 識別 Priya
+2. `get_customer_orders_by_order_number(4471)` → 發現兩筆 CAPTURED
+3. `detect_duplicate_charges_by_order_number(4471)` → 確認重複扣款 $199.99
+4. `issue_refund(4471, 199.99, DUPLICATE_CHARGE, ...)` → 退款成功
+5. `log_support_ticket(intent=BILLING_ISSUE, sentiment=NEGATIVE)`
+
+### 情境 2：保固內退款
+
+**寄件人：** sarah.mitchell@example.com
+**情境：** AeroBlend 300 故障，申請退款
+**預期流程：**
+1. `lookup_customer_by_email` → 識別 Sarah
+2. `get_customer_orders_by_email` → 取得訂單紀錄
+3. `check_warranty_by_order_number_and_sku` → 確認產品仍在保固期內
+4. `issue_refund(..., WARRANTY, ...)` → 執行保固退款
+5. `log_support_ticket(intent=WARRANTY_CLAIM)`
+
+### 情境 3：多語言諷刺投訴（請求進一步佐證）
+
+**寄件人：** rohan.verma@example.com
+**情境：** 中英混雜、充滿諷刺語氣的雜音投訴
+**預期流程：**
+1. 穿透諷刺語氣，識別為保固申訴
+2. `check_warranty_by_order_number_and_sku` → 確認在保固期內
+3. 因尚未確認實際故障狀況，**不直接核發退款**，改為請客戶提供進一步佐證（如影片或照片）
+4. `log_support_ticket(intent=WARRANTY_CLAIM, sentiment=NEGATIVE, detectedLanguage="en+zh")`
+
+### 情境 4：售前產品諮詢
+
+**寄件人：** tonysk@example.com（系統中無此客戶）
+**情境：** 詢問瑜伽墊保固期限
+**預期流程：**
+1. `lookup_customer_by_email` → 未找到客戶（售前場景）
+2. `search_products_by_name_or_sku("yoga mat")` → 找到產品
+3. 回覆產品保固資訊
 
 ---
 
@@ -366,140 +500,6 @@ SUPPORT_TICKETS (id, customer_id→, order_id→, product_id→, channel,
 - JDBC URL: `jdbc:h2:file:./h2db/mcpserverdb`
 - Username: `sa`（預設）
 - Password: 無
-
----
-
-## 快速開始
-
-### 前置條件
-
-- Java 25+
-- Maven（或使用 `./mvnw`）
-- Docker Desktop（Mailpit）
-- Node.js 20+
-- `OPENAI_API_KEY` 環境變數
-
-### 啟動步驟
-
-**1. 啟動 MCP Server**
-```bash
-cd mcp-server
-./mvnw spring-boot:run
-# 驗證：http://localhost:8090/
-```
-
-**2. 啟動 Agent Client**
-```bash
-# 確認已設定環境變數
-export OPENAI_API_KEY=sk-...   # Linux/macOS
-$env:OPENAI_API_KEY="sk-..."   # PowerShell
-
-cd my-agent-client
-./mvnw spring-boot:run
-# 驗證：http://localhost:8080
-```
-
-**3. 啟動 Mailpit**
-
-啟動 Agent Client 時會自動啟動 Mailpit（透過 Docker Compose），請先確認 Docker Desktop 已開啟。
-```bash
-# 驗證：http://localhost:8025
-```
-
-**4. 啟動前端**
-```bash
-cd emailUI
-npm install
-npm run dev
-# 開啟：http://localhost:5173
-```
-
----
-
-## Demo 流程
-
-以下為一個完整的 Demo Cycle，展示從客戶發信到 AI 自動回覆的端對端流程。
-
-### 步驟 1 — 前端模擬客戶發信
-
-開啟 **http://localhost:5173**（emailUI 前端介面）。
-
-選擇預設測試情境或自行填寫表單，點擊送出後，系統會將信件透過 `POST /seed-mail` 注入 Mailpit SMTP，模擬客戶寄信至 `support@example.com` 的完整流程。
-
-### 步驟 2 — Mailpit 模擬客服信箱收件
-
-開啟 **http://localhost:8025**（Mailpit Web UI）。
-
-Mailpit 作為虛擬客服信箱，攔截所有發往 `support@example.com` 的信件。可在此檢視原始信件內容、寄件人、主旨等資訊。
-
-`InboxMonitor` 每 10 秒透過 Mailpit HTTP API 輪詢未讀信件，發現新信後立即交由 Agent Client 處理，並將信件標記為已讀，避免重複處理。
-
-### 步驟 3 — 觀察 Agent Client Console 的 LLM 處理過程
-
-在 **my-agent-client** 的 Console 中，可透過 `PrettyLoggerAdvisor` 輸出的格式化日誌，逐步觀察 LLM 的完整決策過程：
-
-- **SYSTEM**：系統提示詞（代理角色與規則）
-- **USER**：傳入的客戶信件內容
-- **TOOL_CALL**：LLM 決定呼叫的 MCP 工具與參數（如 `lookup_customer_by_email`、`issue_refund` 等）
-- **TOOL_RESPONSE**：MCP Server 回傳的查詢或操作結果
-- **ASSISTANT**：LLM 最終生成的 `AgentResponse`（客戶回覆 + 內部摘要）
-
-`TokenUsageAuditAdvisor` 同時記錄每次 LLM 呼叫的 input / output token 用量。
-
-### 步驟 4 — Mailpit 攔截 AI 自動回覆信件
-
-回到 **http://localhost:8025**，可在 Mailpit 收件匣中看到 Agent Client 透過 SMTP 寄出的自動回覆信件，包含：
-
-- 正確的 `In-Reply-To` 與 `References` 標頭（確保郵件串接）
-- LLM 生成的回覆正文（使用客戶偵測到的語言）
-- 原始信件以 `> ` 引用格式附於信末
-
-至此完成一個完整的 **Demo Cycle**：客戶發信 → 信件進入信箱 → LLM 自主分析並操作工具 → 自動回覆客戶。
-
----
-
-## 測試情境
-
-### 情境 1：重複扣款退款
-
-**寄件人：** priya.sharma@example.com
-**情境：** 訂單 #4471 被扣款兩次（各 $199.99）
-**預期流程：**
-1. `lookup_customer_by_email` → 識別 Priya
-2. `get_customer_orders_by_order_number(4471)` → 發現兩筆 CAPTURED
-3. `detect_duplicate_charges_by_order_number(4471)` → 確認重複扣款 $199.99
-4. `issue_refund(4471, 199.99, DUPLICATE_CHARGE, ...)` → 退款成功
-5. `log_support_ticket(intent=BILLING_ISSUE, sentiment=NEGATIVE)`
-
-### 情境 2：保固內退款
-
-**寄件人：** sarah.mitchell@example.com
-**情境：** AeroBlend 300 故障，申請退款
-**預期流程：**
-1. `lookup_customer_by_email` → 識別 Sarah
-2. `get_customer_orders_by_email` → 取得訂單紀錄
-3. `check_warranty_by_order_number_and_sku` → 確認產品仍在保固期內
-4. `issue_refund(..., WARRANTY, ...)` → 執行保固退款
-5. `log_support_ticket(intent=WARRANTY_CLAIM)`
-
-### 情境 3：多語言諷刺投訴（請求進一步佐證）
-
-**寄件人：** rohan.verma@example.com
-**情境：** 中英混雜、充滿諷刺語氣的雜音投訴
-**預期流程：**
-1. 穿透諷刺語氣，識別為保固申訴
-2. `check_warranty_by_order_number_and_sku` → 確認在保固期內
-3. 因尚未確認實際故障狀況，**不直接核發退款**，改為請客戶提供進一步佐證（如影片或照片）
-4. `log_support_ticket(intent=WARRANTY_CLAIM, sentiment=NEGATIVE, detectedLanguage="en+zh")`
-
-### 情境 4：售前產品諮詢
-
-**寄件人：** tonysk@example.com（系統中無此客戶）
-**情境：** 詢問瑜伽墊保固期限
-**預期流程：**
-1. `lookup_customer_by_email` → 未找到客戶（售前場景）
-2. `search_products_by_name_or_sku("yoga mat")` → 找到產品
-3. 回覆產品保固資訊
 
 ---
 
